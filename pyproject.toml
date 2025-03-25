@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock_analytics"
+version = "0.0.1"
+authors = [{ name = "Onur Kerimoglu", email = "kerimoglu.o@gmail.com" }]
+requires-python = ">=3.11"
+dependencies = ["yfinance>=0.2.55"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+
+
+
+
