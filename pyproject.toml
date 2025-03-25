@@ -9,10 +9,6 @@ authors = [{ name = "Onur Kerimoglu", email = "kerimoglu.o@gmail.com" }]
 requires-python = ">=3.11"
 dependencies = ["yfinance>=0.2.55"]
 
-[tool.setuptools.packages.find]
-where = ["."]
-
-
-
-
+[project.optional-dependencies]
+test = ["pytest==8.3.5"]
 
