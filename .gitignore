@@ -1,5 +1,5 @@
 .venv/*
 
-*.egg-info/*
+*/*.egg-info/*
 
 data/*
