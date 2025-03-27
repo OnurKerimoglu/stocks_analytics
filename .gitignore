@@ -3,5 +3,9 @@
 */*.egg-info/*
 build/*
 *pyc
+*/__pycache__/*
 
 data/*
+
+Docker/airflow_examples/*
+Docker/airflow/logs/*
