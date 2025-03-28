@@ -7,5 +7,7 @@ build/*
 
 data/*
 
-Docker/airflow_examples/*
 Docker/airflow/logs/*
+
+terraform/terraform.tfstate
+terraform/.terraform*
