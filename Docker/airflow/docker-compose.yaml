@@ -74,15 +74,21 @@ x-airflow-common:
     # The following line can be used to set a custom config file, stored in the local config folder
     # If you want to use it, outcomment it and replace airflow.cfg with the name of your config file
     # AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
-    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-keys/ny-taxi-453114-ff980554600b.json
-    AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT: 'google-cloud-platform://?extra__google_cloud_platform__key_path=/opt/airflow/gcp-keys/ny-taxi-453114-ff980554600b.json'
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-keys/stocks-455113-eb2c3f563c78.json
+    AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT: 'google-cloud-platform://?extra__google_cloud_platform__key_path=/opt/airflow/gcp-keys/stocks-455113-eb2c3f563c78.json'
 
     # TODO: Please change GCP_PROJECT_ID & GCP_GCS_BUCKET, as per your config
-    GCP_PROJECT_ID: 'ny-taxi-453114'
-    GCP_GCS_BUCKET: 'ny-taxi-airflow'
-    GCP_BIGQUERY_DATASET: 'ny_taxi_airflow'
+    GCP_PROJECT_ID: 'stocks-455113'
+    GCP_GCS_BUCKET: 'stocks-455113-raw'
+    GCP_BIGQUERY_DATASET: 'stocks-dev'
+    PG_HOST: ${PG_HOST}
+    PG_USER: ${PG_USER}
+    PG_PASSWORD: ${PG_PASSWORD}
+    PG_PORT: ${PG_PORT}
+    PG_DATABASE: ${PG_DATABASE}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
