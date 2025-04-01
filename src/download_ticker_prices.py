@@ -80,8 +80,8 @@ class DownloadTickerData():
         else:
             self.logger.info(f"Fetched stock info for {ticker}")
             fundamentals = self.get_stock_fundamentals(info)
-
-        fpath = os.path.join(self.datapath_info, '{}.json'.format(ticker))
+        suffix = '_test' if self.test else ''
+        fpath = os.path.join(self.datapath_info, '{}{}.json'.format(ticker, suffix))
         with open(fpath, 'w') as fp:
             json.dump(fundamentals, fp)
         self.logger.info(
