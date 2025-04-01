@@ -10,7 +10,7 @@ class DownloadTicker():
     def __init__(
               self,
               ticker,
-              period='1mo', # valid periods: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
+              period='5d', # valid periods: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
               test=False,
               out_format='parquet',  # csv, parquet
               log_level='info' # valid levels: debug, info
@@ -34,7 +34,7 @@ class DownloadTicker():
                 self.ticker = [ticker]
         self.test = test
         if self.test:
-            self.period = '1d'
+            self.period = '5d'
         else:
             self.period = period
         self.out_format = out_format
@@ -60,21 +60,31 @@ class DownloadTicker():
     def download_single(self, ticker):
         self.logger.info(
             'Downloading data for {}'.format(ticker))
-        data = yf.download(
+        df = yf.download(
             ticker,
             period=self.period)
-        if len(data.index) == 0:
+        if len(df.index) == 0:
             self.logger.warning(
                 'No data downloaded')
         else:
+            # This is multi-index, with the second level being the ticker name, which we want to add as a column
+            tickers = list(set([col[1] for col in df.columns.values]))
+            if len(tickers) > 1:
+                self.logger.error(f'Dataframe contains multiple tickers')
+                return
+            df['symbol'] = tickers[0]
+            # time index is not needed
+            df = df.reset_index()
+            # The first level is the actual column names
+            df.columns = [col[0] for col in df.columns.values]
             suffix = '_test' if self.test else ''
             fpath = os.path.join(
                     self.datapath,'{}{}.{}'.format(ticker, suffix, self.out_format))
             if self.out_format == 'csv':
                 with open(fpath, 'w') as f:
-                    data.to_csv(f)
+                    df.to_csv(f)
             elif self.out_format == 'parquet':
-                data.to_parquet(fpath)
+                df.to_parquet(fpath)
             else:
                 raise Exception ('out_format must be "csv" or "parquet"')
             self.logger.info(
@@ -87,6 +97,6 @@ if __name__ == '__main__':
         ticker='default_list',
         # ticker=['MSFT', 'AAPL'],
         # ticker='MSFT',
-        period='5d',
-        test=False,
+        period='max',
+        test=True,
         out_format='parquet').download()
