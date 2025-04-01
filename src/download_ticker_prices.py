@@ -1,4 +1,4 @@
-import contextlib
+import json
 import logging
 import os
 
@@ -6,7 +6,7 @@ import yfinance as yf
 
 from src.shared import config_logger
 
-class DownloadTickerPrices():
+class DownloadTickerData():
     def __init__(
               self,
               ticker,
@@ -43,23 +43,116 @@ class DownloadTickerPrices():
         self.rootpath = os.path.dirname(
             os.path.dirname(
                 os.path.abspath(__file__)))
-        self.datapath = os.path.join(self.rootpath, 'data', 'prices')
-        if not os.path.exists(self.datapath):
-            os.makedirs(self.datapath)
+        self.datapath_price = os.path.join(self.rootpath, 'data', 'price')
+        if not os.path.exists(self.datapath_price):
+            os.makedirs(self.datapath_price)
             self.logger.info(
-                'Created data directory {}'.format(self.datapath))
+                'Created data directory {}'.format(self.datapath_price))
+        self.datapath_info = os.path.join(self.rootpath, 'data', 'info')
+        if not os.path.exists(self.datapath_info):
+            os.makedirs(self.datapath_info)
+            self.logger.info(
+                'Created data directory {}'.format(self.datapath_info))
 
     def get_default_tickers(self):
         tickers = ["AAPL", "GOOGL", "MSFT", "AMZN"]
         return tickers
 
-    def download(self):
+    def download_infos(self):
         for ticker in self.ticker:
-            self.download_single(ticker)
+            self.download_info_single(ticker)
+
+    def download_prices(self):
+        for ticker in self.ticker:
+            self.download_price_single(ticker)
     
-    def download_single(self, ticker):
+    def download_info_single(self, ticker):
         self.logger.info(
-            'Downloading data for {}'.format(ticker))
+            'Downloading info for {}'.format(ticker))
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info  # Fetch all available info
+        except Exception as e:
+            self.logger.error(f"Error fetching stock info for {ticker}: {str(e)}")
+            info = {}
+        if len(info) == 1:
+            fundamentals = {}
+        else:
+            self.logger.info(f"Fetched stock info for {ticker}")
+            fundamentals = self.get_stock_fundamentals(info)
+
+        fpath = os.path.join(self.datapath_info, '{}.json'.format(ticker))
+        with open(fpath, 'w') as fp:
+            json.dump(fundamentals, fp)
+        self.logger.info(
+            'Data downloaded to {}'.format(fpath))
+
+    def get_stock_fundamentals(
+            self,
+            info: dict
+            ) -> dict:
+        """
+        Attempts to fetches key fundamental metrics for a given stock ticker using yfinance.
+        Args:
+        info: dictionary of stock info
+        Returns:
+        dict: Dictionary of fundamental metrics with human-readable keys
+        """
+
+        # Define a safe fetch method to avoid entire function failure
+        def safe_get(key, transform=None):
+            value = info.get(key, "Metric not available")
+            if value != "Metric not available" and transform:
+                try:
+                    return transform(value)
+                except Exception:
+                    return "metric not available"
+            return value
+
+        # Extract key financial metrics
+        fundamentals = {
+            "Company Name": safe_get("longName"),
+            "Sector": safe_get("sector"),
+            "Industry": safe_get("industry"),
+            "Market Capitalization": safe_get("marketCap"),
+            
+            # Valuation Metrics
+            "P/E Ratio (Trailing)": safe_get("trailingPE"),
+            "P/E Ratio (Forward)": safe_get("forwardPE"),
+            "P/B Ratio (Price to Book)": safe_get("priceToBook"),
+            "P/S Ratio (Price to Sales)": safe_get("priceToSalesTrailing12Months"),
+            "Dividend Yield (%)": safe_get("dividendYield", lambda x: round(x * 100, 2)),
+
+            # Profitability Metrics
+            "Earnings Per Share (EPS)": safe_get("trailingEps"),
+            "Return on Equity (ROE)": safe_get("returnOnEquity"),
+            "Return on Assets (ROA)": safe_get("returnOnAssets"),
+            "Gross Margin (%)": safe_get("grossMargins", lambda x: round(x * 100, 2)),
+            "Operating Margin (%)": safe_get("operatingMargins", lambda x: round(x * 100, 2)),
+
+            # Financial Health Metrics
+            "Debt-to-Equity Ratio": safe_get("debtToEquity"),
+            "Current Ratio": safe_get("currentRatio"),
+            "Quick Ratio": safe_get("quickRatio"),
+            "Interest Coverage Ratio": safe_get(
+                "ebitda",
+                lambda ebitda: round(ebitda / self.info["totalDebt"], 2) if self.info.get("totalDebt") else "Metric not available"
+            ),
+
+            # Growth Metrics
+            "Revenue Growth (%)": safe_get("revenueGrowth", lambda x: round(x * 100, 2)),
+            "EPS Growth (%)": safe_get("earningsGrowth", lambda x: round(x * 100, 2)),
+
+            # Market & Ownership
+            "Institutional Ownership (%)": safe_get("heldPercentInstitutions", lambda x: round(x * 100, 2)),
+            "Insider Ownership (%)": safe_get("heldPercentInsiders", lambda x: round(x * 100, 2)),
+        }
+        
+        return fundamentals
+
+    def download_price_single(self, ticker):
+        self.logger.info(
+            'Downloading price data for {}'.format(ticker))
         df = yf.download(
             ticker,
             period=self.period)
@@ -79,7 +172,7 @@ class DownloadTickerPrices():
             df.columns = [col[0] for col in df.columns.values]
             suffix = '_test' if self.test else ''
             fpath = os.path.join(
-                    self.datapath,'{}{}.{}'.format(ticker, suffix, self.out_format))
+                    self.datapath_price,'{}{}.{}'.format(ticker, suffix, self.out_format))
             if self.out_format == 'csv':
                 with open(fpath, 'w') as f:
                     df.to_csv(f)
@@ -92,10 +185,12 @@ class DownloadTickerPrices():
 
 
 if __name__ == '__main__':
-    DownloadTickerPrices(
+    dtd = DownloadTickerData(
         ticker='default_list',
         # ticker=['MSFT', 'AAPL'],
         # ticker='MSFT',
         period='max',
         test=False,
-        out_format='parquet').download()
+        out_format='parquet')
+    dtd.download_prices()
+    # dtd.download_infos()

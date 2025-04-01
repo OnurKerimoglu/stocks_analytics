@@ -30,7 +30,7 @@ class LoadTickerPrices():
         self.rootpath = os.path.dirname(
             os.path.dirname(
                 os.path.abspath(__file__)))
-        self.datapath = os.path.join(self.rootpath, 'data', 'prices')
+        self.datapath = os.path.join(self.rootpath, 'data', 'price')
         self.parquet_paths = self.fetch_parquet_paths()
 
         # Define dlt pipelines
