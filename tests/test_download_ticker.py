@@ -1,15 +1,15 @@
-from src.download_ticker import DownloadTicker
+from src.download_ticker_prices import DownloadTickerPrices
 import os
 
 ticker = 'MSFT'
-download_ticker = DownloadTicker(
+dlp = DownloadTickerPrices(
         ticker=ticker,
         period='1d',
         out_format='parquet',
         test=True)
 
 def test_download():
-    download_ticker.download()
-    fpath = os.path.join(download_ticker.datapath, '{}_test.{}'.format(ticker, download_ticker.out_format))
+    dlp.download()
+    fpath = os.path.join(dlp.datapath, '{}_test.{}'.format(ticker, dlp.out_format))
     assert os.path.exists(fpath)
     os.remove(fpath)

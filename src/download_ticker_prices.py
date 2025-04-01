@@ -6,7 +6,7 @@ import yfinance as yf
 
 from src.shared import config_logger
 
-class DownloadTicker():
+class DownloadTickerPrices():
     def __init__(
               self,
               ticker,
@@ -43,7 +43,7 @@ class DownloadTicker():
         self.rootpath = os.path.dirname(
             os.path.dirname(
                 os.path.abspath(__file__)))
-        self.datapath = os.path.join(self.rootpath, 'data')
+        self.datapath = os.path.join(self.rootpath, 'data', 'prices')
         if not os.path.exists(self.datapath):
             os.makedirs(self.datapath)
             self.logger.info(
@@ -72,7 +72,7 @@ class DownloadTicker():
             if len(tickers) > 1:
                 self.logger.error(f'Dataframe contains multiple tickers')
                 return
-            df['symbol'] = tickers[0]
+            df['Symbol'] = tickers[0]
             # time index is not needed
             df = df.reset_index()
             # The first level is the actual column names
@@ -91,12 +91,11 @@ class DownloadTicker():
                 'Data downloaded to {}'.format(fpath))
 
 
-
 if __name__ == '__main__':
-    DownloadTicker(
+    DownloadTickerPrices(
         ticker='default_list',
         # ticker=['MSFT', 'AAPL'],
         # ticker='MSFT',
         period='max',
-        test=True,
+        test=False,
         out_format='parquet').download()
