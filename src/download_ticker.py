@@ -24,9 +24,16 @@ class DownloadTicker():
                 'Initialized DownloadTicker in production mode')
 
         # input arguments
-        self.ticker = ticker
-        self.period = period
+        if ticker == 'default_list':
+            self.ticker = self.get_default_tickers()
+        else:
+            if type(ticker) == list:
+                self.ticker = ticker
+            else:
+                self.ticker = [ticker]
         self.test = test
+        if self.test:
+            self.period = '1d'
         self.out_format = out_format
 
         # set datapath and create data directory
@@ -38,6 +45,10 @@ class DownloadTicker():
             os.makedirs(self.datapath)
             self.logger.info(
                 'Created data directory {}'.format(self.datapath))
+
+    def get_default_tickers(self):
+        tickers = ["AAPL", "GOOGL", "MSFT", "AMZN"]
+        return tickers
 
     def __config_logger(self, log_level):
         log_format = '%(asctime)s - %(levelname)s - %(message)s'
@@ -53,10 +64,14 @@ class DownloadTicker():
             raise Exception ('log_level must be "debug" or "info"')
 
     def download(self):
+        for ticker in self.ticker:
+            self.download_single(ticker)
+    
+    def download_single(self, ticker):
         self.logger.info(
-            'Downloading data for {}'.format(self.ticker))
+            'Downloading data for {}'.format(ticker))
         data = yf.download(
-            self.ticker,
+            ticker,
             period=self.period)
         if len(data.index) == 0:
             self.logger.warning(
@@ -64,7 +79,7 @@ class DownloadTicker():
         else:
             suffix = '_test' if self.test else ''
             fpath = os.path.join(
-                    self.datapath,'{}{}.{}'.format(self.ticker, suffix, self.out_format))
+                    self.datapath,'{}{}.{}'.format(ticker, suffix, self.out_format))
             if self.out_format == 'csv':
                 with open(fpath, 'w') as f:
                     data.to_csv(f)
@@ -79,7 +94,9 @@ class DownloadTicker():
 
 if __name__ == '__main__':
     DownloadTicker(
-        ticker='MSFT',
-        period='1d',
+        ticker='default_list',
+        # ticker=['MSFT', 'AAPL'],
+        # ticker='MSFT',
+        period='max',
         test=True,
         out_format='parquet').download()
