@@ -11,6 +11,7 @@ class DownloadTicker():
               ticker,
               period, # valid periods: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
               test=False,
+              out_format='parquet',  # csv, parquet
               log_level='info' # valid levels: debug, info
               ):
         self.__config_logger(log_level)
@@ -26,6 +27,7 @@ class DownloadTicker():
         self.ticker = ticker
         self.period = period
         self.test = test
+        self.out_format = out_format
 
         # set datapath and create data directory
         self.rootpath = os.path.dirname(
@@ -50,28 +52,34 @@ class DownloadTicker():
         else:
             raise Exception ('log_level must be "debug" or "info"')
 
-    def download_silent(self):
+    def download(self):
         self.logger.info(
             'Downloading data for {}'.format(self.ticker))
-        # silence the verbose YF-API
-        with open(os.devnull, 'w') as devnull:
-            with contextlib.redirect_stdout(devnull):
-                data = yf.download(
-                    self.ticker,
-                    period=self.period)
-                if len(data.index) == 0:
-                    self.logger.warning(
-                        'No data downloaded')
-                else:
-                    suffix = '_test' if self.test else ''
-                    fpath = os.path.join(
-                            self.datapath,'{}{}.csv'.format(self.ticker, suffix))
-                    data.to_csv(fpath)
-                    self.logger.info(
-                        'Data downloaded to {}'.format(fpath))
+        data = yf.download(
+            self.ticker,
+            period=self.period)
+        if len(data.index) == 0:
+            self.logger.warning(
+                'No data downloaded')
+        else:
+            suffix = '_test' if self.test else ''
+            fpath = os.path.join(
+                    self.datapath,'{}{}.{}'.format(self.ticker, suffix, self.out_format))
+            if self.out_format == 'csv':
+                with open(fpath, 'w') as f:
+                    data.to_csv(f)
+            elif self.out_format == 'parquet':
+                data.to_parquet(fpath)
+            else:
+                raise Exception ('out_format must be "csv" or "parquet"')
+            self.logger.info(
+                'Data downloaded to {}'.format(fpath))
+
 
 
 if __name__ == '__main__':
     DownloadTicker(
         ticker='MSFT',
-        period='1d').download_silent()
+        period='1d',
+        test=True,
+        out_format='parquet').download()
