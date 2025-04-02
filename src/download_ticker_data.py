@@ -2,6 +2,7 @@ import json
 import logging
 import os
 
+from datetime import datetime
 import yfinance as yf
 
 from src.shared import config_logger
@@ -79,7 +80,7 @@ class DownloadTickerData():
             fundamentals = {}
         else:
             self.logger.info(f"Fetched stock info for {ticker}")
-            fundamentals = self.get_stock_fundamentals(info)
+            fundamentals = self.get_stock_fundamentals(ticker, info)
         suffix = '_test' if self.test else ''
         fpath = os.path.join(self.datapath_info, '{}{}.json'.format(ticker, suffix))
         with open(fpath, 'w') as fp:
@@ -89,11 +90,13 @@ class DownloadTickerData():
 
     def get_stock_fundamentals(
             self,
+            ticker: str,
             info: dict
             ) -> dict:
         """
         Attempts to fetches key fundamental metrics for a given stock ticker using yfinance.
         Args:
+        ticker: ticker symbol
         info: dictionary of stock info
         Returns:
         dict: Dictionary of fundamental metrics with human-readable keys
@@ -101,16 +104,20 @@ class DownloadTickerData():
 
         # Define a safe fetch method to avoid entire function failure
         def safe_get(key, transform=None):
-            value = info.get(key, "Metric not available")
+            value = info.get(key, "")
             if value != "Metric not available" and transform:
                 try:
                     return transform(value)
                 except Exception:
-                    return "metric not available"
+                    return ""
             return value
 
         # Extract key financial metrics
         fundamentals = {
+            # General Information
+            "Symbol": ticker,
+            "DateFetched": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+
             "Company Name": safe_get("longName"),
             "Sector": safe_get("sector"),
             "Industry": safe_get("industry"),
@@ -138,6 +145,7 @@ class DownloadTickerData():
                 "ebitda",
                 lambda ebitda: round(ebitda / self.info["totalDebt"], 2) if self.info.get("totalDebt") else "Metric not available"
             ),
+            "overallRisk": safe_get("overallRisk"),
 
             # Growth Metrics
             "Revenue Growth (%)": safe_get("revenueGrowth", lambda x: round(x * 100, 2)),
@@ -146,8 +154,29 @@ class DownloadTickerData():
             # Market & Ownership
             "Institutional Ownership (%)": safe_get("heldPercentInstitutions", lambda x: round(x * 100, 2)),
             "Insider Ownership (%)": safe_get("heldPercentInsiders", lambda x: round(x * 100, 2)),
+            
+            # Analyst Ratings
+            "averageAnalystRating": safe_get("averageAnalystRating"),
+            "numberOfAnalystOpinions": safe_get("numberOfAnalystOpinions"),
+            "currentPrice": safe_get("currentPrice"),
+            "targetHighPrice": safe_get("targetHighPrice"),
+            "targetLowPrice": safe_get("targetLowPrice"),
+            "targetMeanPrice": safe_get("targetMeanPrice"),
+            "targetMedianPrice": safe_get("targetMedianPrice"),
+
+            # Dates
+            "earningsTimestampStart": safe_get("earningsTimestampStart"),
+            "earningsTimestampEnd": safe_get("earningsTimestampEnd"),
+            "dividendDate": safe_get("dividendDate"),
         }
-        
+
+        # convert timestamps to datetimes
+        for key in ["earningsTimestampStart", "earningsTimestampEnd", "dividendDate"]:
+            if key in fundamentals:
+                tstamp = fundamentals[key]
+                if type(tstamp) == int:
+                    fundamentals[key] = datetime.fromtimestamp(fundamentals[key]).strftime("%Y-%m-%d %H:%M:%S")
+
         return fundamentals
 
     def download_price_single(self, ticker):
@@ -192,5 +221,5 @@ if __name__ == '__main__':
         period='max',
         test=False,
         out_format='parquet')
-    dtd.download_prices()
-    # dtd.download_infos()
+    # dtd.download_prices()
+    dtd.download_infos()
