@@ -11,6 +11,7 @@ RUN apt-get update -qq && apt-get install vim -qqq
 USER airflow
 COPY requirements.txt .
 RUN pip install --no-cache-dir "apache-airflow==2.10.5" -r requirements.txt
+ENV PYTHONPATH "${PYTHONPATH}:${AIRFLOW_HOME}"
 
 # install google cloud sdk
 # Ref: https://airflow.apache.org/docs/docker-stack/recipes.html
