@@ -6,7 +6,8 @@ build/*
 *pyc
 */__pycache__/*
 
-data/*
+data/price/*
+data/info/*
 
 Docker/airflow/logs/*
 
