@@ -36,9 +36,6 @@ class LoadTickerData():
         self.price_paths = self.fetch_data_paths(self.datapath_price, 'parquet')
         self.fund_paths = self.fetch_data_paths(self.datapath_fund, 'json')
 
-        gcp_key_fpath = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_key_fpath
-
         # Define dlt pipelines
         # Price
         self.price_pipeline_duckdb = dlt.pipeline(
@@ -145,12 +142,16 @@ class LoadTickerData():
 
 
 if __name__ == '__main__':
+    # needed for uploading to bigquery:
+    gcp_key_fpath = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_key_fpath
+    # initialize:
     load_ticker = LoadTickerData(
         full_load=False,
         # dest='duckdb',
         dest='bigquery',
         dev_mode=False,
         log_level='info')
-    # load_ticker.run_price_pipeline()
+    load_ticker.run_price_pipeline()
     load_ticker.run_fundamentals_pipeline()
     
