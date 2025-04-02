@@ -11,7 +11,7 @@ dependencies = [
 "yfinance>=0.2.55",
 "google-cloud-bigquery==3.31.0",
 "google-cloud-bigquery-storage==2.30.0",
-"dlt[duckdb, bigquery]==1.9.0"
+"dlt[duckdb, bigquery]==1.9.0",
 "duckdb==1.2.1"
 ]
 
