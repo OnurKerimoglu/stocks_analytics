@@ -7,7 +7,7 @@ import pandas as pd
 
 from shared import config_logger
 
-class LoadTickerPrices():
+class LoadTickerData():
     def __init__(
             self,
             full_load=False,
@@ -145,7 +145,7 @@ class LoadTickerPrices():
 
 
 if __name__ == '__main__':
-    load_ticker = LoadTickerPrices(
+    load_ticker = LoadTickerData(
         full_load=False,
         # dest='duckdb',
         dest='bigquery',
