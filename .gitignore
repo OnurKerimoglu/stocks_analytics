@@ -11,3 +11,5 @@ Docker/airflow/logs/*
 
 terraform/terraform.tfstate*
 terraform/.terraform*
+
+*.duckdb
