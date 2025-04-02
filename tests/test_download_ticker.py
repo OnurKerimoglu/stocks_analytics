@@ -1,4 +1,4 @@
-from src.download_ticker_prices import DownloadTickerData
+from src.download_ticker_data import DownloadTickerData
 import os
 
 ticker = 'MSFT'
