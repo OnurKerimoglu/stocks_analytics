@@ -1,4 +1,3 @@
-apache-airflow==2.10.5
 apache-airflow-providers-google==14.0.0
 dlt[duckdb, bigquery]==1.9.0
 duckdb==1.2.1
