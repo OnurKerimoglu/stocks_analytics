@@ -12,14 +12,12 @@ import pyarrow.csv as pv
 import pyarrow.parquet as pq
 import sqlalchemy
 
+from src.test import TestClass
+from src.download_ticker_data import DownloadTickerData
+
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 BUCKET = os.environ.get("GCP_GCS_BUCKET")
 
-PG_HOST = os.environ.get("PG_HOST")
-PG_USER = os.environ.get("PG_USER")
-PG_PASSWORD = os.environ.get("PG_PASSWORD")
-PG_PORT = os.environ.get("PG_PORT")
-PG_DATABASE = os.environ.get("PG_DATABASE")
 
 
 # csv_file = "yellow_tripdata_2021-01.csv.gz"
@@ -31,10 +29,18 @@ BIGQUERY_DATASET = os.environ.get("GCP_BIGQUERY_DATASET", 'trips_data_all')
 @dag(schedule=None, start_date=days_ago(1), catchup=False)
 def ingest_raw_data_dag():
     
+    # fetch_tickers_external = PythonOperator(
+    #     task_id="fetch_tickers_external_task",
+    #     python_callable=fetch_tickers_function,
+    #     op_kwargs={
+    #         "num_tickers": 3
+    #     },
+    # )
+
     @task
-    def fetch_tickers():
-        TICKERS = ["AAPL", "GOOGL", "MSFT", "AMZN"]
-        return TICKERS
+    def fetch_tickers_external(num_tickers):
+        test_class = TestClass(num_tickers)
+        return test_class.fetch_tickers()
 
     @task
     def fetch_ticker_data(ticker: str):
@@ -56,10 +62,9 @@ def ingest_raw_data_dag():
         print(f"Creating bq table for {ticker}")
 
     with TaskGroup(group_id="ticker_processing") as tg:
-        tickers = fetch_tickers()
-        fetched = fetch_ticker_data.expand(ticker=tickers)
+        fetched = fetch_tickers_external(2)
         converted = convert_to_parquet.expand(ticker=fetched)
-        uploaded = upload_to_gcs.expand(ticker=converted)
-        upload_to_bq.expand(ticker=uploaded)
+        # uploaded = upload_to_gcs.expand(ticker=converted)
+        # upload_to_bq.expand(ticker=uploaded)
 
 dag_instance = ingest_raw_data_dag()
