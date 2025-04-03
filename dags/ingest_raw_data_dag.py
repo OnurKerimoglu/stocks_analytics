@@ -12,8 +12,9 @@ import pyarrow.parquet as pq
 import sqlalchemy
 
 from src.shared import config_logger
-from src.fetch_symbols import FetchSymbols
 from src.download_ticker_data import DownloadTickerData
+from src.fetch_symbols import FetchSymbols
+from src.gc_functions import upload_to_gcs
 
 config_logger('info')
 logger = logging.getLogger(__name__)
@@ -26,6 +27,15 @@ PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 BUCKET = os.environ.get("GCP_GCS_BUCKET")
 BIGQUERY_DATASET = os.environ.get("GCP_BIGQUERY_DATASET", 'trips_data_all')
 
+def get_local_data_path(source, ticker):
+    if source == 'price':
+        ext = '.parquet'
+    elif source == 'info':
+        ext = '.json'
+    else:
+        raise ValueError("source must be 'price' or 'info'")
+    fpath = os.path.join(rootpath, 'data', source, ticker+ext)
+    return fpath
 
 @dag(schedule=None, start_date=days_ago(1), catchup=False)
 def ingest_raw_data_dag():
@@ -52,14 +62,20 @@ def ingest_raw_data_dag():
         return ticker
 
     @task
-    def upload_price_to_gcs(ticker: str):
+    def upload_local_to_gcs(source: str, ticker: str):
         logger.info(f"Storing {ticker} price in GCS")
+        fpath = get_local_data_path(source, ticker)
+        object_name=f"{source}/{os.path.basename(fpath)}"
+        if os.path.exists(fpath):
+            logger.info(f"Uploading {fpath} to {object_name}")
+            upload_to_gcs(
+                bucket = BUCKET,
+                object_name=object_name,
+                local_file=fpath)
+        else:
+            logger.warning(f"{fpath} does not exist")
         return ticker
 
-    @task
-    def upload_info_to_gcs(ticker: str):
-        logger.info(f"Storing {ticker} info in GCS")
-        return ticker
     
     @task
     def upload_price_to_bq(ticker: str):
@@ -78,16 +94,10 @@ def ingest_raw_data_dag():
             return ticker_gcs
     
     @task
-    def remove_local_data(ticker: str, source: str):
-        if source == 'price':
-            ext = '.parquet'
-        elif source == 'info':
-            ext = '.json'
-        else:
-            raise ValueError("source must be 'price' or 'info'")
-        fpath = os.path.join(rootpath, 'data', source, ticker+ext)
+    def remove_local_data(source: str, ticker: str):
+        fpath = get_local_data_path(source, ticker)
         if os.path.exists(fpath):
-            os.remove(fpath)
+            # os.remove(fpath)
             logger.info(f"Removed {fpath}")
         else:
             logger.warning(f"{fpath} does not exist")
@@ -96,13 +106,13 @@ def ingest_raw_data_dag():
         symbols = fetch_symbols('default_stocks.csv')
         with TaskGroup(group_id="subtg_ticker_raw_price") as subtg1:
             price_symbol_local = download_ticker_price_max.expand(ticker=symbols)
-            price_symbol_gcs = upload_price_to_gcs.expand(ticker=price_symbol_local)
+            price_symbol_gcs = upload_local_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
             price_symbol_bq = upload_price_to_bq.expand(ticker=price_symbol_local)
             price_symbol = check_completion_gcs_bq.expand(ticker_gcs=price_symbol_gcs, ticker_bq=price_symbol_bq)
             remove_local_data.partial(source='price').expand(ticker=price_symbol)
         with TaskGroup(group_id="subtg_ticker_raw_info") as subtg2:
             info_symbol_local = download_ticker_info.expand(ticker=symbols)
-            info_symbol_gcs = upload_info_to_gcs.expand(ticker=info_symbol_local)
+            info_symbol_gcs = upload_local_to_gcs.partial(source='info').expand(ticker=info_symbol_local)
             info_symbol_bq = upload_info_to_bq.expand(ticker=info_symbol_local)
             info_symbol = check_completion_gcs_bq.expand(ticker_gcs=info_symbol_gcs, ticker_bq=info_symbol_bq)
             remove_local_data.partial(source='info').expand(ticker=info_symbol)
