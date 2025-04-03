@@ -3,7 +3,7 @@ import os
 
 import pandas as pd
 
-from shared import config_logger
+from src.shared import config_logger
 
 
 class FetchSymbols():
