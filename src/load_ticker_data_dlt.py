@@ -34,7 +34,7 @@ class LoadTickerData():
         self.datapath_price = os.path.join(self.rootpath, 'data', 'price')
         self.datapath_fund = os.path.join(self.rootpath, 'data', 'info')
         self.price_paths = self.fetch_data_paths(self.datapath_price, 'parquet')
-        self.fund_paths = self.fetch_data_paths(self.datapath_fund, 'json')
+        self.fund_paths = self.fetch_data_paths(self.datapath_fund, 'parquet')
 
         # Define dlt pipelines
         # Price
@@ -95,11 +95,15 @@ class LoadTickerData():
     @dlt.resource(name="fundamentals", primary_key="symbol")
     @staticmethod
     def stock_fundamentals_raw(
-        json_paths
+        fpaths
         ):
-        for fpath in json_paths:
-            with open(fpath, encoding='utf-8') as f:
-                d = json.load(f)
+        for fpath in fpaths:
+            if fpath.endswith('.json'):
+                with open(fpath, encoding='utf-8') as f:
+                    d = json.load(f)
+            elif fpath.endswith('.parquet'):
+                df = pd.read_parquet(fpath)
+                d = df.to_dict(orient="records")
             print(f'Full-load from {fpath}')
             yield d
 
@@ -123,7 +127,6 @@ class LoadTickerData():
             write_disposition=write_disp)
         # self.logger.info(info)
         self.logger.info(pipeline.last_trace)
-
 
     def run_fundamentals_pipeline(self):
         if self.dest == 'duckdb':
