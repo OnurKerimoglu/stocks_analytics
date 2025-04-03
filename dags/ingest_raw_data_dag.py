@@ -1,7 +1,7 @@
 import os
 import logging
 
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, task_group
 from airflow.utils.task_group import TaskGroup
 from airflow.utils.dates import days_ago
 from google.cloud import storage
@@ -35,6 +35,16 @@ def get_local_raw_data_path(source, ticker):
         raise ValueError("source must be 'price' or 'info'")
     fpath = os.path.join(rootpath, 'data', source, ticker+ext)
     return fpath
+
+def fetch_file_paths(dirpath, ext):
+    # construct a list of absolute paths based on the 
+    # files with the specified extension in the self.datapth folder
+    fpaths = []
+    for f in os.listdir(dirpath):
+        if f.endswith(f'.{ext}'):
+            fpaths.append(os.path.join(dirpath, f))
+    return fpaths
+
 
 @dag(schedule=None, start_date=days_ago(1), catchup=False)
 def ingest_raw_data_dag():
@@ -105,24 +115,17 @@ def ingest_raw_data_dag():
         return ticker
         
     @task
-    def dlt_pipeline_price():
-        logger.info(f"Running the dlt pipeline for price data")
+    def dlt_pipeline(source: str):
+        logger.info(f"Running the dlt pipeline for {source} data")
         load_ticker = LoadTickerData(
             full_load=False,
             dest='bigquery',
             dev_mode=False,
             log_level='info')
-        load_ticker.run_price_pipeline()
-        return 'done'
-    
-    @task
-    def dlt_pipeline_info():
-        logger.info(f"Running the dlt pipeline for info data")
-        load_ticker = LoadTickerData(
-            dest='bigquery',
-            dev_mode=False,
-            log_level='info')
-        load_ticker.run_info_pipeline()
+        if source == 'price':
+            load_ticker.run_price_pipeline()
+        elif source == 'info':
+            load_ticker.run_info_pipeline()
         return 'done'
 
     @task
@@ -132,30 +135,41 @@ def ingest_raw_data_dag():
             return ticker_gcs
     
     @task
-    def remove_local_data(source: str, ticker: str):
-        fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
-        if os.path.exists(fpath):
+    def remove_local_data(source: str):
+        fpaths = fetch_file_paths(
+            os.path.join(rootpath, 'data', source),
+            'parquet')
+        logger.info(f"Found {len(fpaths)} to remove")
+        for fpath in fpaths:
             # os.remove(fpath)
             logger.info(f"Removed {fpath}")
-        else:
-            logger.warning(f"{fpath} does not exist")
+        return 'done'
 
-    with TaskGroup(group_id="tg_ticker_raw") as tg:
-        symbols = fetch_symbols('default_stocks.csv')
-        with TaskGroup(group_id="subtg_ticker_raw_price") as subtg1:
-            price_symbol_local = download_ticker_price_max.expand(ticker=symbols)
-            price_symbol_gcs = upload_local_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
-            price_symbol_bqext = create_bq_table_task.partial(source='price').expand(ticker=price_symbol_gcs)
-            price_symbol_bq = dlt_pipeline_price.expand(ticker=price_symbol_local)
-            price_symbol = check_completion_gcs_bq.expand(ticker_gcs=price_symbol_gcs, ticker_bq=price_symbol_bq)
-            remove_local_data.partial(source='price').expand(ticker=price_symbol)
-        with TaskGroup(group_id="subtg_ticker_raw_info") as subtg2:
-            info_symbol_local = download_ticker_info.expand(ticker=symbols)
-            info_symbol_local_ref = reformat_json_to_parquet_task.partial(source='info').expand(ticker=info_symbol_local)
-            info_symbol_gcs = upload_local_to_gcs.partial(source='info').expand(ticker=info_symbol_local_ref)
-            info_symbol_bqext =create_bq_table_task.partial(source='info').expand(ticker=info_symbol_gcs)
-            info_symbol_bq = dlt_pipeline_info.expand(ticker=info_symbol_local)
-            info_symbol = check_completion_gcs_bq.expand(ticker_gcs=info_symbol_gcs, ticker_bq=info_symbol_bq)
-            remove_local_data.partial(source='info').expand(ticker=info_symbol)
-    
+    symbols = fetch_symbols('default_stocks.csv')
+    price_symbol_local = download_ticker_price_max.expand(ticker=symbols)
+    @task_group(group_id="tg_price")
+    def tg_price():
+        price_symbol_gcs = upload_local_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
+        price_symbol_bqext = create_bq_table_task.partial(source='price').expand(ticker=price_symbol_gcs)
+    dlt_pipeline_price = dlt_pipeline('price')
+    # price_symbol = check_completion_gcs_bq.expand(ticker_gcs=price_symbol_gcs, ticker_bq=price_symbol_bq)
+    remove_local_price = remove_local_data(source='price')
+
+    info_symbol_local = download_ticker_info.expand(ticker=symbols)
+    info_symbol_local_ref = reformat_json_to_parquet_task.partial(source='info').expand(ticker=info_symbol_local)
+    @task_group(group_id="tg_info")
+    def tg_info():
+        info_symbol_gcs = upload_local_to_gcs.partial(source='info').expand(ticker=info_symbol_local_ref)
+        info_symbol_bqext =create_bq_table_task.partial(source='info').expand(ticker=info_symbol_gcs)
+    dlt_pipeline_info = dlt_pipeline('info')
+    # info_symbol = check_completion_gcs_bq.expand(ticker_gcs=info_symbol_gcs, ticker_bq=info_symbol_bq)
+    remove_local_info = remove_local_data(source='info')
+
+    symbols >> price_symbol_local
+    price_symbol_local >> tg_price() >> remove_local_price
+    price_symbol_local >> dlt_pipeline_price >> remove_local_price
+    symbols >> info_symbol_local >> info_symbol_local_ref
+    info_symbol_local_ref >> tg_info() >> remove_local_info
+    info_symbol_local_ref >> dlt_pipeline_info >> remove_local_info
+
 dag_instance = ingest_raw_data_dag()
