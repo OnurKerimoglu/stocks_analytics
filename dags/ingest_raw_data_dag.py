@@ -12,6 +12,7 @@ from src.shared import config_logger, reformat_json_to_parquet
 from src.download_ticker_data import DownloadTickerData
 from src.fetch_symbols import FetchSymbols
 from src.gc_functions import upload_to_gcs, create_bq_external_table_operator
+from src.load_ticker_data_dlt import LoadTickerData
 
 config_logger('info')
 logger = logging.getLogger(__name__)
@@ -104,14 +105,25 @@ def ingest_raw_data_dag():
         return ticker
         
     @task
-    def append_price_to_bq(ticker: str):
-        logger.info(f"Uploading {ticker} price to BQ")
-        return ticker
+    def dlt_pipeline_price():
+        logger.info(f"Running the dlt pipeline for price data")
+        load_ticker = LoadTickerData(
+            full_load=False,
+            dest='bigquery',
+            dev_mode=False,
+            log_level='info')
+        load_ticker.run_price_pipeline()
+        return 'done'
     
     @task
-    def append_info_to_bq(ticker: str):
-        logger.info(f"Uploading {ticker} info to BQ")
-        return ticker
+    def dlt_pipeline_info():
+        logger.info(f"Running the dlt pipeline for info data")
+        load_ticker = LoadTickerData(
+            dest='bigquery',
+            dev_mode=False,
+            log_level='info')
+        load_ticker.run_info_pipeline()
+        return 'done'
 
     @task
     def check_completion_gcs_bq(ticker_gcs:str, ticker_bq:str):
@@ -134,7 +146,7 @@ def ingest_raw_data_dag():
             price_symbol_local = download_ticker_price_max.expand(ticker=symbols)
             price_symbol_gcs = upload_local_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
             price_symbol_bqext = create_bq_table_task.partial(source='price').expand(ticker=price_symbol_gcs)
-            price_symbol_bq = append_info_to_bq.expand(ticker=price_symbol_local)
+            price_symbol_bq = dlt_pipeline_price.expand(ticker=price_symbol_local)
             price_symbol = check_completion_gcs_bq.expand(ticker_gcs=price_symbol_gcs, ticker_bq=price_symbol_bq)
             remove_local_data.partial(source='price').expand(ticker=price_symbol)
         with TaskGroup(group_id="subtg_ticker_raw_info") as subtg2:
@@ -142,7 +154,7 @@ def ingest_raw_data_dag():
             info_symbol_local_ref = reformat_json_to_parquet_task.partial(source='info').expand(ticker=info_symbol_local)
             info_symbol_gcs = upload_local_to_gcs.partial(source='info').expand(ticker=info_symbol_local_ref)
             info_symbol_bqext =create_bq_table_task.partial(source='info').expand(ticker=info_symbol_gcs)
-            info_symbol_bq = append_info_to_bq.expand(ticker=info_symbol_local)
+            info_symbol_bq = dlt_pipeline_info.expand(ticker=info_symbol_local)
             info_symbol = check_completion_gcs_bq.expand(ticker_gcs=info_symbol_gcs, ticker_bq=info_symbol_bq)
             remove_local_data.partial(source='info').expand(ticker=info_symbol)
     
