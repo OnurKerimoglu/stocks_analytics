@@ -92,19 +92,19 @@ def ingest_raw_data_dag():
         else:
             logger.warning(f"{fpath} does not exist")
 
-    with TaskGroup(group_id="taskgroup_ticker_raw") as tg:
+    with TaskGroup(group_id="tg_ticker_raw") as tg:
         symbols = fetch_symbols('default_stocks.csv')
-        price_symbol_local = download_ticker_price_max.expand(ticker=symbols)
-        info_symbol_local = download_ticker_info.expand(ticker=symbols)
-        with TaskGroup(group_id="nested_tg1_ticker_price_storing") as nested_tg1:
+        with TaskGroup(group_id="subtg_ticker_raw_price") as subtg1:
+            price_symbol_local = download_ticker_price_max.expand(ticker=symbols)
             price_symbol_gcs = upload_price_to_gcs.expand(ticker=price_symbol_local)
             price_symbol_bq = upload_price_to_bq.expand(ticker=price_symbol_local)
             price_symbol = check_completion_gcs_bq.expand(ticker_gcs=price_symbol_gcs, ticker_bq=price_symbol_bq)
-        with TaskGroup(group_id="nested_tg2_ticker_info_storing") as nested_tg2:
+            remove_local_data.partial(source='price').expand(ticker=price_symbol)
+        with TaskGroup(group_id="subtg_ticker_raw_info") as subtg2:
+            info_symbol_local = download_ticker_info.expand(ticker=symbols)
             info_symbol_gcs = upload_info_to_gcs.expand(ticker=info_symbol_local)
             info_symbol_bq = upload_info_to_bq.expand(ticker=info_symbol_local)
             info_symbol = check_completion_gcs_bq.expand(ticker_gcs=info_symbol_gcs, ticker_bq=info_symbol_bq)
-        remove_local_data.partial(source='price').expand(ticker=price_symbol)
-        remove_local_data.partial(source='info').expand(ticker=info_symbol)
+            remove_local_data.partial(source='info').expand(ticker=info_symbol)
 
 dag_instance = ingest_raw_data_dag()
