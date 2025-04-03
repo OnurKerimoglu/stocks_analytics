@@ -4,12 +4,11 @@ import logging
 from airflow.decorators import dag, task
 from airflow.utils.task_group import TaskGroup
 from airflow.utils.dates import days_ago
-
 from google.cloud import storage
 from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateExternalTableOperator
 import sqlalchemy
 
-from src.shared import config_logger
+from src.shared import config_logger, reformat_json_to_parquet
 from src.download_ticker_data import DownloadTickerData
 from src.fetch_symbols import FetchSymbols
 from src.gc_functions import upload_to_gcs, create_bq_external_table_operator
@@ -26,7 +25,7 @@ BUCKET = os.environ.get("GCP_GCS_BUCKET")
 # BIGQUERY_DATASET = os.environ.get("GCP_BIGQUERY_DATASET", 'stocks_dev')
 BIGQUERY_DATASET = 'stocks_dev'
 
-def get_local_data_path(source, ticker):
+def get_local_raw_data_path(source, ticker):
     if source == 'price':
         ext = '.parquet'
     elif source == 'info':
@@ -61,9 +60,19 @@ def ingest_raw_data_dag():
         return ticker
 
     @task
+    def reformat_json_to_parquet_task(source:str, ticker:str):
+        fpath = get_local_raw_data_path(source, ticker)
+        if os.path.exists(fpath):
+            logger.info(f"Reformatting {fpath} to parquet")
+            # reformat_json_to_parquet(fpath)
+        else:
+            logger.warning(f"{fpath} does not exist")
+        return ticker
+        
+    @task
     def upload_local_to_gcs(source: str, ticker: str):
         logger.info(f"Storing {ticker} price in GCS")
-        fpath = get_local_data_path(source, ticker)
+        fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
         object_name=f"{source}/{os.path.basename(fpath)}"
         if os.path.exists(fpath):
             logger.info(f"Uploading {fpath} to {object_name}")
@@ -76,9 +85,9 @@ def ingest_raw_data_dag():
         return ticker
     
     @task
-    def create_bq_table_task(source: str, ticker: str):
+    def create_bq_table_task(source: str, ticker: str, **context):
         logger.info(f"Creating external talbe in BQ for {ticker}")
-        fpath = get_local_data_path(source, ticker)
+        fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
         object_name=f"{source}/{os.path.basename(fpath)}"
         fmt=os.path.basename(fpath).split('.')[1].upper()
         table_name = f'{source}_{ticker}'
@@ -90,7 +99,9 @@ def ingest_raw_data_dag():
             dataset=BIGQUERY_DATASET,
             table=table_name,
             format=fmt)
-        return operator
+        operator.execute(context=context)
+        logger.info(f"Created table in BQ: {BIGQUERY_DATASET}.{table_name}")
+        return ticker
         
     @task
     def append_price_to_bq(ticker: str):
@@ -110,7 +121,7 @@ def ingest_raw_data_dag():
     
     @task
     def remove_local_data(source: str, ticker: str):
-        fpath = get_local_data_path(source, ticker)
+        fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
         if os.path.exists(fpath):
             # os.remove(fpath)
             logger.info(f"Removed {fpath}")
@@ -122,14 +133,15 @@ def ingest_raw_data_dag():
         with TaskGroup(group_id="subtg_ticker_raw_price") as subtg1:
             price_symbol_local = download_ticker_price_max.expand(ticker=symbols)
             price_symbol_gcs = upload_local_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
-            create_bq_table_task.partial(source='price').expand(ticker=price_symbol_gcs)
+            price_symbol_bqext = create_bq_table_task.partial(source='price').expand(ticker=price_symbol_gcs)
             price_symbol_bq = append_info_to_bq.expand(ticker=price_symbol_local)
             price_symbol = check_completion_gcs_bq.expand(ticker_gcs=price_symbol_gcs, ticker_bq=price_symbol_bq)
             remove_local_data.partial(source='price').expand(ticker=price_symbol)
         with TaskGroup(group_id="subtg_ticker_raw_info") as subtg2:
             info_symbol_local = download_ticker_info.expand(ticker=symbols)
-            info_symbol_gcs = upload_local_to_gcs.partial(source='info').expand(ticker=info_symbol_local)
-            # create_bq_table_task.partial(source='info').expand(ticker=info_symbol_gcs)
+            info_symbol_local_ref = reformat_json_to_parquet_task.partial(source='info').expand(ticker=info_symbol_local)
+            info_symbol_gcs = upload_local_to_gcs.partial(source='info').expand(ticker=info_symbol_local_ref)
+            info_symbol_bqext =create_bq_table_task.partial(source='info').expand(ticker=info_symbol_gcs)
             info_symbol_bq = append_info_to_bq.expand(ticker=info_symbol_local)
             info_symbol = check_completion_gcs_bq.expand(ticker_gcs=info_symbol_gcs, ticker_bq=info_symbol_bq)
             remove_local_data.partial(source='info').expand(ticker=info_symbol)
