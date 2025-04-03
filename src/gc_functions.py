@@ -1,6 +1,5 @@
 import logging
 
-from airflow import AirflowException
 from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateExternalTableOperator
 from google.cloud import storage
 
@@ -54,8 +53,7 @@ def create_bq_external_table_operator(
     Returns: 
         BigQueryCreateExternalTableOperator
     """
-
-    BQoperator =BigQueryCreateExternalTableOperator(
+    BQoperator = BigQueryCreateExternalTableOperator(
         task_id="bigquery_external_table_task",
         table_resource={
             "tableReference": {
