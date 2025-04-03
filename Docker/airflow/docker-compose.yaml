@@ -80,7 +80,7 @@ x-airflow-common:
     # TODO: Please change GCP_PROJECT_ID & GCP_GCS_BUCKET, as per your config
     GCP_PROJECT_ID: 'stocks-455113'
     GCP_GCS_BUCKET: 'stocks-455113-raw'
-    GCP_BIGQUERY_DATASET: 'stocks-dev'
+    GCP_BIGQUERY_DATASET: 'stocks_dev'
     PG_HOST: ${PG_HOST}
     PG_USER: ${PG_USER}
     PG_PASSWORD: ${PG_PASSWORD}
