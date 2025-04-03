@@ -5,7 +5,7 @@ import dlt
 import json
 import pandas as pd
 
-from shared import config_logger
+from src.shared import config_logger
 
 class LoadTickerData():
     def __init__(
@@ -66,7 +66,7 @@ class LoadTickerData():
     
     def fetch_data_paths(self, datapath, ext):
         # construct a list of absolute paths based on the 
-        # (non-test) parquet files in the self.datapth folder
+        # (non-test) files with the specified extension in the self.datapth folder
         fpaths = []
         for f in os.listdir(datapath):
             if f.endswith(f'.{ext}') and not f.endswith(f'_test.{ext}'):
