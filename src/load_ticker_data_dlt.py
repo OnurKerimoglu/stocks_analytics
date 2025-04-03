@@ -32,9 +32,9 @@ class LoadTickerData():
             os.path.dirname(
                 os.path.abspath(__file__)))
         self.datapath_price = os.path.join(self.rootpath, 'data', 'price')
-        self.datapath_fund = os.path.join(self.rootpath, 'data', 'info')
-        self.price_paths = self.fetch_data_paths(self.datapath_price, 'parquet')
-        self.fund_paths = self.fetch_data_paths(self.datapath_fund, 'parquet')
+        self.datapath_info = os.path.join(self.rootpath, 'data', 'info')
+        self.paths_price = self.fetch_data_paths(self.datapath_price, 'parquet')
+        self.paths_info = self.fetch_data_paths(self.datapath_info, 'parquet')
 
         # Define dlt pipelines
         # Price
@@ -50,15 +50,15 @@ class LoadTickerData():
             dataset_name="stocks_raw",
             dev_mode=self.dev_mode
         )
-        # Fundamentals
-        self.fundamentals_pipeline_duckdb = dlt.pipeline(
-            pipeline_name='load_stock_fundamentals_raw_duckb',
+        # Info
+        self.info_pipeline_duckdb = dlt.pipeline(
+            pipeline_name='load_stock_info_raw_duckb',
             destination='duckdb',
             dataset_name='stocks_raw',
             dev_mode=self.dev_mode
         )
-        self.fundamentals_pipeline_bq = dlt.pipeline(
-            pipeline_name="load_stock_fundamentals_raw_bq",
+        self.info_pipeline_bq = dlt.pipeline(
+            pipeline_name="load_stock_info_raw_bq",
             destination="bigquery",
             dataset_name="stocks_raw",
             dev_mode=self.dev_mode
@@ -92,9 +92,9 @@ class LoadTickerData():
             print(f'{load_type}-load from {fpath}')
             yield df.to_dict(orient="records")
     
-    @dlt.resource(name="fundamentals", primary_key="symbol")
+    @dlt.resource(name="info", primary_key="symbol")
     @staticmethod
-    def stock_fundamentals_raw(
+    def stock_info_raw(
         fpaths
         ):
         for fpath in fpaths:
@@ -121,24 +121,24 @@ class LoadTickerData():
             write_disp = 'append'
             load_type = 'incremental'
         info = pipeline.run(
-            self.stock_prices_raw(self.price_paths, load_type),
+            self.stock_prices_raw(self.paths_price, load_type),
             table_name='stock_prices',
             loader_file_format="jsonl",
             write_disposition=write_disp)
         # self.logger.info(info)
         self.logger.info(pipeline.last_trace)
 
-    def run_fundamentals_pipeline(self):
+    def run_info_pipeline(self):
         if self.dest == 'duckdb':
-            pipeline = self.fundamentals_pipeline_duckdb
+            pipeline = self.info_pipeline_duckdb
         elif self.dest == 'bigquery':
-            pipeline = self.fundamentals_pipeline_bq
+            pipeline = self.info_pipeline_bq
         else:
             raise ValueError(f"Unknown dest: {self.dest}. Accepted: 'duckdb', 'bigquery'")
         write_disp = 'merge'
         info = pipeline.run(
-            self.stock_fundamentals_raw(self.fund_paths),
-            table_name='stock_fundamentals',
+            self.stock_info_raw(self.paths_info),
+            table_name='stock_info',
             write_disposition=write_disp)
         # self.logger.info(info)
         self.logger.info(pipeline.last_trace)
@@ -155,6 +155,6 @@ if __name__ == '__main__':
         dest='bigquery',
         dev_mode=False,
         log_level='info')
-    load_ticker.run_price_pipeline()
-    load_ticker.run_fundamentals_pipeline()
+    # load_ticker.run_price_pipeline()
+    load_ticker.run_info_pipeline()
     
