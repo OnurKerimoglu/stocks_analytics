@@ -17,7 +17,12 @@ def config_logger(log_level):
             format=log_format)
     else:
         raise Exception ('log_level must be "debug" or "info"')
-    
+
+def create_dir_if_not_exist(path, logger):
+    if not os.path.exists(path):
+        os.makedirs(path)
+        logger.info('Created data directory {}'.format(path))
+
 def reformat_csv_to_parquet(src_file):
     if not (src_file.endswith('.csv') or src_file.endswith('.csv.gz')):
         logging.error("Can only accept source files in CSV or CSV.GZ format")
