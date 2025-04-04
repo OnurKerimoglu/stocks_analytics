@@ -110,15 +110,15 @@ def ingest_raw_data_dag():
             dataset=BIGQUERY_DATASET,
             table=table_name,
             format=fmt)
-        operator.execute(context=context)
+        # operator.execute(context=context)
         logger.info(f"Created table in BQ: {BIGQUERY_DATASET}.{table_name}")
         return ticker
         
     @task
-    def dlt_pipeline(source: str):
+    def run_dlt_pipeline(source: str, full_load: bool):
         logger.info(f"Running the dlt pipeline for {source} data")
         load_ticker = LoadTickerData(
-            full_load=False,
+            full_load=full_load,
             dest='bigquery',
             dev_mode=False,
             log_level='info')
@@ -127,12 +127,6 @@ def ingest_raw_data_dag():
         elif source == 'info':
             load_ticker.run_info_pipeline()
         return 'done'
-
-    @task
-    def check_completion_gcs_bq(ticker_gcs:str, ticker_bq:str):
-        if ticker_gcs == ticker_bq:
-            logger.info(f"Both gcs and bq jobs completed")
-            return ticker_gcs
     
     @task
     def remove_local_data(source: str):
@@ -151,8 +145,7 @@ def ingest_raw_data_dag():
     def tg_price():
         price_symbol_gcs = upload_local_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
         price_symbol_bqext = create_bq_table_task.partial(source='price').expand(ticker=price_symbol_gcs)
-    dlt_pipeline_price = dlt_pipeline('price')
-    # price_symbol = check_completion_gcs_bq.expand(ticker_gcs=price_symbol_gcs, ticker_bq=price_symbol_bq)
+    dlt_pipeline_price = run_dlt_pipeline(source='price', full_load=True)
     remove_local_price = remove_local_data(source='price')
 
     info_symbol_local = download_ticker_info.expand(ticker=symbols)
@@ -161,8 +154,7 @@ def ingest_raw_data_dag():
     def tg_info():
         info_symbol_gcs = upload_local_to_gcs.partial(source='info').expand(ticker=info_symbol_local_ref)
         info_symbol_bqext =create_bq_table_task.partial(source='info').expand(ticker=info_symbol_gcs)
-    dlt_pipeline_info = dlt_pipeline('info')
-    # info_symbol = check_completion_gcs_bq.expand(ticker_gcs=info_symbol_gcs, ticker_bq=info_symbol_bq)
+    dlt_pipeline_info = run_dlt_pipeline(source='info', full_load=True)
     remove_local_info = remove_local_data(source='info')
 
     symbols >> price_symbol_local
