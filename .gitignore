@@ -8,6 +8,8 @@ build/*
 
 data/price/*
 data/info/*
+data/*.csv
+!data/*.default_stocks.csv
 
 Docker/airflow/logs/*
 
