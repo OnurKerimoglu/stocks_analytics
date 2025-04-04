@@ -8,6 +8,7 @@ build/*
 
 data/price/*
 data/info/*
+data/etf/*
 data/*.csv
 !data/*.default_stocks.csv
 
