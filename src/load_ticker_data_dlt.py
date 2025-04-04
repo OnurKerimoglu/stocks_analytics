@@ -31,12 +31,27 @@ class LoadTickerData():
         self.rootpath = os.path.dirname(
             os.path.dirname(
                 os.path.abspath(__file__)))
+        self.datapath_etf= os.path.join(self.rootpath, 'data', 'etf')
         self.datapath_price = os.path.join(self.rootpath, 'data', 'price')
         self.datapath_info = os.path.join(self.rootpath, 'data', 'info')
+        self.paths_etfs = self.fetch_data_paths(self.datapath_etf, 'parquet')
         self.paths_price = self.fetch_data_paths(self.datapath_price, 'parquet')
         self.paths_info = self.fetch_data_paths(self.datapath_info, 'parquet')
 
         # Define dlt pipelines
+        # ETF
+        self.etf_pipeline_duckdb = dlt.pipeline(
+            pipeline_name='load_etfs_raw_duckb',
+            destination='duckdb',
+            dataset_name='stocks_raw',
+            dev_mode=self.dev_mode
+        )
+        self.etf_pipeline_bq = dlt.pipeline(
+            pipeline_name="load_etfs_raw_bq",
+            destination="bigquery",
+            dataset_name="stocks_raw",
+            dev_mode=self.dev_mode
+        )
         # Price
         self.price_pipeline_duckdb = dlt.pipeline(
             pipeline_name='load_stock_prices_raw_duckb',
@@ -77,6 +92,18 @@ class LoadTickerData():
             self.logger.info(f'Found {len(fpaths)} {ext} files at {datapath}')
         return fpaths
 
+    @dlt.resource(name="etfs") # , primary_key="symbol")
+    @staticmethod
+    def etfs_raw(
+        fpaths
+        ):
+        for fpath in fpaths:
+            if fpath.endswith('.parquet'):
+                df = pd.read_parquet(fpath)
+                d = df.to_dict(orient="records")
+            print(f'Full-load from {fpath}')
+            yield d
+
     @dlt.resource(name="prices")
     @staticmethod
     def stock_prices_raw(
@@ -106,6 +133,21 @@ class LoadTickerData():
                 d = df.to_dict(orient="records")
             print(f'Full-load from {fpath}')
             yield d
+
+    def run_etf_pipeline(self):
+        if self.dest == 'duckdb':
+            pipeline = self.etf_pipeline_duckdb
+        elif self.dest == 'bigquery':
+            pipeline = self.etf_pipeline_bq
+        else:
+            raise ValueError(f"Unknown dest: {self.dest}. Accepted: 'duckdb', 'bigquery'")
+        write_disp = 'replace'
+        info = pipeline.run(
+            self.etfs_raw(self.paths_etfs),
+            table_name='etfs',
+            write_disposition=write_disp)
+        # self.logger.info(info)
+        self.logger.info(pipeline.last_trace)
 
     def run_price_pipeline(self):
         if self.dest == 'duckdb':
@@ -146,8 +188,8 @@ class LoadTickerData():
 
 if __name__ == '__main__':
     # not needed if google variables are provided in ~/.dlt/secrets.toml
-    # gcp_key_fpath = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
-    # os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_key_fpath
+    gcp_key_fpath = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_key_fpath
     # initialize:
     load_ticker = LoadTickerData(
         full_load=False,
@@ -155,6 +197,7 @@ if __name__ == '__main__':
         dest='bigquery',
         dev_mode=False,
         log_level='info')
-    load_ticker.run_price_pipeline()
+    load_ticker.run_etf_pipeline()
+    # load_ticker.run_price_pipeline()
     # load_ticker.run_info_pipeline()
     
