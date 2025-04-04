@@ -3,10 +3,11 @@ import json
 import logging
 import os
 
-from etf_scraper import ETFScraper
+import pandas as pd
 import yfinance as yf
 
-from src.shared import config_logger
+from src.shared import config_logger, create_dir_if_not_exist
+from src.download_etf_data import DownloadETFData
 
 class DownloadTickerData():
     def __init__(
@@ -30,18 +31,18 @@ class DownloadTickerData():
         self.rootpath = os.path.dirname(
             os.path.dirname(
                 os.path.abspath(__file__)))
-        self.datapath= os.path.join(self.rootpath, 'data')
-        self.create_dir_if_not_exist(self.datapath)
+        self.datapath = os.path.join(self.rootpath, 'data')
+        create_dir_if_not_exist(self.datapath, self.logger)
         self.datapath_price = os.path.join(self.rootpath, 'data', 'price')
-        self.create_dir_if_not_exist(self.datapath_price)
+        create_dir_if_not_exist(self.datapath_price, self.logger)
         self.datapath_info = os.path.join(self.rootpath, 'data', 'info')
-        self.create_dir_if_not_exist(self.datapath_info)
+        create_dir_if_not_exist(self.datapath_info, self.logger)
 
         # input arguments
         if ticker == 'default_list':
             self.ticker = self.get_default_tickers()
-        elif ticker.startswith('ETFholdings_'):
-            self.ticker = self.get_etf_tickers(ticker)
+        elif ticker.endswith('.csv'):
+            self.ticker = self.get_tickers_from_csv(ticker)
         else:
             if type(ticker) == list:
                 self.ticker = ticker
@@ -54,32 +55,17 @@ class DownloadTickerData():
             self.period = period
         self.out_format = out_format
 
-    def create_dir_if_not_exist(self, path):
-        if not os.path.exists(path):
-            os.makedirs(path)
-            self.logger.info('Created data directory {}'.format(path))
-
     def get_default_tickers(self):
         tickers = ["AAPL", "GOOGL", "MSFT", "AMZN"]
         return tickers
     
-    def get_etf_tickers(self, ticker):
-        fund_ticker = ticker.split('ETFholdings_')[1]
-        etf_scraper = ETFScraper()
-        etfs_df = etf_scraper.listings_df
-        if not etfs_df.ticker.str.contains(fund_ticker).any():
-            raise ValueError(f"ETF {fund_ticker} not found")
-        holdings_df = etf_scraper.query_holdings(fund_ticker, None)
-        holdings = holdings_df.ticker.tolist()
-        ticker_name = etfs_df.fund_name.loc[etfs_df.ticker == fund_ticker].values[0]
-        self.logger.info(f'Fetched {len(holdings)} holding tickers for ETF ticker: {fund_ticker} ({ticker_name})')
-        # write the tickers to a local csv file
-        fpath = os.path.join(self.datapath, f'{ticker}.csv')
-        holdings_df_reduced = holdings_df['ticker']
-        holdings_df_reduced.rename('symbol', inplace=True)
-        holdings_df_reduced.to_csv(fpath, index=False)
-        self.logger.info(f'Holding tickers stored in {fpath}')
-        return holdings
+    def get_tickers_from_csv(self, fname):
+        fpath = os.path.join(self.datapath, fname)
+        if not os.path.exists(fpath):
+            raise FileNotFoundError(fpath)
+        with open(fpath, 'r') as fp:
+            df = pd.read_csv(fp)
+        return list(df.symbol)
 
     def download_infos(self):
         for ticker in self.ticker:
@@ -237,7 +223,7 @@ class DownloadTickerData():
 
 if __name__ == '__main__':
     dtd = DownloadTickerData(
-        ticker='ETFholdings_IVV',
+        ticker='ETF_holdings_IVV.csv',
         # ticker='default_list',
         # ticker=['MSFT', 'AAPL'],
         # ticker='MSFT',
@@ -245,4 +231,4 @@ if __name__ == '__main__':
         test=False,
         out_format='parquet')
     # dtd.download_prices()
-    # dtd.download_infos()
+    dtd.download_infos()
