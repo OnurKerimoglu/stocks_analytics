@@ -10,6 +10,7 @@ import sqlalchemy
 
 from src.shared import config_logger, reformat_json_to_parquet
 from src.download_ticker_data import DownloadTickerData
+from src.download_etf_data import DownloadETFData
 from src.fetch_symbols import FetchSymbols
 from src.gc_functions import upload_to_gcs, create_bq_external_table_operator
 from src.load_ticker_data_dlt import LoadTickerData
@@ -48,6 +49,12 @@ def fetch_file_paths(dirpath, ext):
 
 @dag(schedule=None, start_date=days_ago(1), catchup=False)
 def ingest_raw_data_dag():
+
+    @task
+    def download_etf_data(etf_ticker):
+        DownloadETFData(
+            etf_ticker
+            ).download_etf_tickers()
 
     @task
     def fetch_symbols(filename):
@@ -122,6 +129,8 @@ def ingest_raw_data_dag():
             dest='bigquery',
             dev_mode=False,
             log_level='info')
+        if source == 'etf':
+            load_ticker.run_etf_pipeline()
         if source == 'price':
             load_ticker.run_price_pipeline()
         elif source == 'info':
@@ -139,7 +148,11 @@ def ingest_raw_data_dag():
             logger.info(f"Removed {fpath}")
         return 'done'
 
-    symbols = fetch_symbols('default_stocks.csv')
+    ETF_symbol = 'IVV'
+    etfs = download_etf_data(ETF_symbol)
+    dlt_pipeline_etf = run_dlt_pipeline(source='etf', full_load=True)
+    remove_local_etf = remove_local_data(source='etf')
+    symbols = fetch_symbols(f'ETF_holdings_{ETF_symbol}.csv')
     price_symbol_local = download_ticker_price_max.expand(ticker=symbols)
     @task_group(group_id="tg_price")
     def tg_price():
@@ -157,7 +170,8 @@ def ingest_raw_data_dag():
     dlt_pipeline_info = run_dlt_pipeline(source='info', full_load=True)
     remove_local_info = remove_local_data(source='info')
 
-    symbols >> price_symbol_local
+    etfs >> dlt_pipeline_etf >> remove_local_etf
+    etfs >> symbols >> price_symbol_local
     price_symbol_local >> tg_price() >> remove_local_price
     price_symbol_local >> dlt_pipeline_price >> remove_local_price
     symbols >> info_symbol_local >> info_symbol_local_ref
