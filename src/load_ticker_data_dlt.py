@@ -135,7 +135,7 @@ class LoadTickerData():
             pipeline = self.info_pipeline_bq
         else:
             raise ValueError(f"Unknown dest: {self.dest}. Accepted: 'duckdb', 'bigquery'")
-        write_disp = 'merge'
+        write_disp = 'replace'
         info = pipeline.run(
             self.stock_info_raw(self.paths_info),
             table_name='stock_info',
@@ -145,9 +145,9 @@ class LoadTickerData():
 
 
 if __name__ == '__main__':
-    # needed for uploading to bigquery:
-    gcp_key_fpath = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_key_fpath
+    # not needed if google variables are provided in ~/.dlt/secrets.toml
+    # gcp_key_fpath = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
+    # os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_key_fpath
     # initialize:
     load_ticker = LoadTickerData(
         full_load=False,
@@ -155,6 +155,6 @@ if __name__ == '__main__':
         dest='bigquery',
         dev_mode=False,
         log_level='info')
-    # load_ticker.run_price_pipeline()
-    load_ticker.run_info_pipeline()
+    load_ticker.run_price_pipeline()
+    # load_ticker.run_info_pipeline()
     
