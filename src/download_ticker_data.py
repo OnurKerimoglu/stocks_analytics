@@ -8,6 +8,7 @@ import yfinance as yf
 
 from src.shared import config_logger, create_dir_if_not_exist
 from src.download_etf_data import DownloadETFData
+from src.fetch_symbols import FetchSymbols
 
 class DownloadTickerData():
     def __init__(
@@ -42,7 +43,9 @@ class DownloadTickerData():
         if ticker == 'default_list':
             self.ticker = self.get_default_tickers()
         elif ticker.endswith('.csv'):
-            self.ticker = self.get_tickers_from_csv(ticker)
+            self.ticker = FetchSymbols(
+                file=os.path.join(self.datapath, ticker)
+                ).symbols
         else:
             if type(ticker) == list:
                 self.ticker = ticker
@@ -58,14 +61,6 @@ class DownloadTickerData():
     def get_default_tickers(self):
         tickers = ["AAPL", "GOOGL", "MSFT", "AMZN"]
         return tickers
-    
-    def get_tickers_from_csv(self, fname):
-        fpath = os.path.join(self.datapath, fname)
-        if not os.path.exists(fpath):
-            raise FileNotFoundError(fpath)
-        with open(fpath, 'r') as fp:
-            df = pd.read_csv(fp)
-        return list(df.symbol)
 
     def download_infos(self):
         for ticker in self.ticker:
