@@ -1,3 +1,10 @@
+"""
+DAG for:
+1. Downloading ETF data for a given ETF ticker (input parameter), and price and info data for each ETF holding
+2. Uploading etf, price and info (fundamental) data to GCS and creating external tables in BQ
+3. Running the dlt pipeline to load and merge etf, price and info data into BQ
+4. Removing local data
+"""
 import os
 import logging
 
@@ -51,6 +58,7 @@ def fetch_file_paths(dirpath, ext):
     schedule=None,
     start_date=days_ago(1), 
     catchup=False,
+    doc_md = __doc__,
     params={
         'ETF_symbol': 'IVV'
     }
