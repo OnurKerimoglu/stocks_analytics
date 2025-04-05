@@ -1,7 +1,26 @@
 # Stocks Analytics
 
-## Data Ingestion Pipeline
-### Setting up Airflow
+## Motivation and Objective
+
+## Data Sources
+
+### ETF Holding Compositions
+
+### Stock Prices
+
+### Stock Information
+
+## Data Warehouse Design
+
+## Tools and Technical Setup
+
+### Terraform
+
+### dlt
+
+### dbt
+
+### Airflow
 
 1. build and run the docker image (see https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html for general information on how to run airflow with docker compose. Here project specific steps are provided). 
     -  Under the project root, issue:
@@ -19,6 +38,8 @@ project_id = ****
 private_key = ****
 client_email = ****
 ``` 
+
+## Data Ingestion Pipeline
 
 ### Ingestion DAG
 The ingestion DAG, i.e., [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) looks like this:
