@@ -23,24 +23,14 @@ class FetchSymbols():
         self.symbols = self._fetch_symbols()
 
     def _fetch_symbols(self):
-        default_symbols_flag = False
         if self.file != '':
             self.logger.info(f'Attempting to fetch symbols from {self.file}')
             if os.path.exists(self.file):
-                try:
-                    symbols = self._fetch_symbols_from_file()
-                except Exception as e:
-                    self.logger.warning(f'An error occurred:\n {e}')
-                    self.logger.warning(f'Falling back to default symbols')
-                    default_symbols_flag = True
+                symbols = self._fetch_symbols_from_file()
             else:
-                self.logger.warning(f'Specified file could not be found, falling back to default symbols')
-                default_symbols_flag = True
+                raise FileNotFoundError(f'Specified file could not be found at {self.file}')
         else:
-            self.logger.info('No file path provided')
-            default_symbols_flag = True
-        
-        if default_symbols_flag:
+            self.logger.info('No file path provided, fetching default symbols')
             symbols = self._fetch_default_symbols()
         return symbols
 
