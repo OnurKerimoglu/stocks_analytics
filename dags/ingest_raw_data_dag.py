@@ -9,6 +9,7 @@ import os
 import logging
 
 from airflow.decorators import dag, task, task_group
+from airflow.models.param import Param
 from airflow.utils.task_group import TaskGroup
 from airflow.utils.dates import days_ago
 from google.cloud import storage
@@ -58,9 +59,26 @@ def fetch_file_paths(dirpath, ext):
     schedule=None,
     start_date=days_ago(1), 
     catchup=False,
+    description="Ingest raw data for a given ETF ticker",
     doc_md = __doc__,
+    default_args={
+        "owner": "Onur",
+        "retries": 3,
+        "retry_delay": 5
+    },
     params={
-        'ETF_symbol': 'IVV'
+        'ETF_symbol': Param(
+            'QTOP',
+            type='string',
+            title='ETF Ticker symbol',
+            description='Current options: QTOP (S&P Top 100), OEF (Nasdaq top 30), IVV (S&P 500)',
+            enum=[
+                'QTOP',
+                'OEF',
+                'IVV'
+            ],
+
+        )
     }
 )
 def ingest_raw_data_dag():
@@ -164,8 +182,9 @@ def ingest_raw_data_dag():
             logger.info(f"Removed {fpath}")
         return 'done'
 
-    # Control Flow
     ETF_symbol = '{{ params.ETF_symbol }}'
+    logger.info(f'Running the ingest_raw_data_dag for {ETF_symbol}')
+    # Control Flow
     # ETF tasks
     etf_ticker = get_etf_data(ETF_symbol)
     @task_group(group_id="tg_etf")
