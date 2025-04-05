@@ -47,14 +47,22 @@ def fetch_file_paths(dirpath, ext):
     return fpaths
 
 
-@dag(schedule=None, start_date=days_ago(1), catchup=False)
-def ingest_raw_data_dag(ETF_symbol):
-
+@dag(
+    schedule=None,
+    start_date=days_ago(1), 
+    catchup=False,
+    params={
+        'ETF_symbol': 'IVV'
+    }
+)
+def ingest_raw_data_dag():
+    
     @task
     def get_etf_data(etf_ticker):
         DownloadETFData(
             etf_ticker
             ).download_etf_tickers()
+        return etf_ticker
 
     @task
     def fetch_symbols(filename):
@@ -88,7 +96,7 @@ def ingest_raw_data_dag(ETF_symbol):
         return ticker
         
     @task
-    def upload_to_gcs(source: str, ticker: str):
+    def ul_to_gcs(source: str, ticker: str):
         logger.info(f"Storing {ticker} price in GCS")
         fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
         object_name=f"{source}/{os.path.basename(fpath)}"
@@ -147,20 +155,23 @@ def ingest_raw_data_dag(ETF_symbol):
             # os.remove(fpath)
             logger.info(f"Removed {fpath}")
         return 'done'
+
+    # Control Flow
+    ETF_symbol = '{{ params.ETF_symbol }}'
     # ETF tasks
-    etfs = get_etf_data(ETF_symbol)
+    etf_ticker = get_etf_data(ETF_symbol)
     @task_group(group_id="tg_etf")
     def tg_etf():
-        etf_gcs = upload_to_gcs.partial(source='etf').expand(ticker=etfs)
-        etf_bqext = create_bq_table.partial(source='etf').expand(ticker=etf_gcs)
+        etf_gcs = ul_to_gcs(source='etf', ticker=etf_ticker)
+        etf_bqext = create_bq_table(source='etf', ticker=etf_gcs)
     dlt_pipeline_etf = run_dlt_pl(source='etf', full_load=True)
     remove_local_etf = remove_local(source='etf')
-    symbols = fetch_symbols(f'ETF_holdings_{ETF_symbol}.csv')
+    symbols = fetch_symbols(f'ETF_holdings_{str(ETF_symbol)}.csv')
     # Price tasks
     price_symbol_local = get_ticker_price.expand(ticker=symbols)
     @task_group(group_id="tg_price")
     def tg_price():
-        price_symbol_gcs = upload_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
+        price_symbol_gcs = ul_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
         price_symbol_bqext = create_bq_table.partial(source='price').expand(ticker=price_symbol_gcs)
     dlt_pipeline_price = run_dlt_pl(source='price', full_load=True)
     remove_local_price = remove_local(source='price')
@@ -169,15 +180,15 @@ def ingest_raw_data_dag(ETF_symbol):
     info_symbol_local_ref = reformat_json_to_pq.partial(source='info').expand(ticker=info_symbol_local)
     @task_group(group_id="tg_info")
     def tg_info():
-        info_symbol_gcs = upload_to_gcs.partial(source='info').expand(ticker=info_symbol_local_ref)
+        info_symbol_gcs = ul_to_gcs.partial(source='info').expand(ticker=info_symbol_local_ref)
         info_symbol_bqext =create_bq_table.partial(source='info').expand(ticker=info_symbol_gcs)
     dlt_pipeline_info = run_dlt_pl(source='info', full_load=True)
     remove_local_info = remove_local(source='info')
 
     # etf tasks
-    etfs >> tg_etf() >> remove_local_etf
-    etfs >> dlt_pipeline_etf >> remove_local_etf
-    etfs >> symbols
+    etf_ticker >> tg_etf() >> remove_local_etf
+    etf_ticker >> dlt_pipeline_etf >> remove_local_etf
+    etf_ticker >> symbols
     # price tasks
     symbols >> price_symbol_local
     price_symbol_local >> tg_price() >> remove_local_price
@@ -187,4 +198,4 @@ def ingest_raw_data_dag(ETF_symbol):
     info_symbol_local_ref >> tg_info() >> remove_local_info
     info_symbol_local_ref >> dlt_pipeline_info >> remove_local_info
 
-dag_instance = ingest_raw_data_dag(ETF_symbol='IVV')
+dag_instance = ingest_raw_data_dag()
