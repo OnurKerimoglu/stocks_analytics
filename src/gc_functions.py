@@ -33,6 +33,14 @@ def upload_to_gcs(
     blob.upload_from_filename(local_file)
     logger.info(f"File {local_file} uploaded to {object_name}")
 
+def blob_exists(
+        bucket,
+        object_name):
+    client = storage.Client()
+    bucket = client.bucket(bucket)
+    blob = bucket.blob(object_name)
+    return blob.exists()
+
 def create_bq_external_table_operator(
         projectID: str,
         bucket: str,

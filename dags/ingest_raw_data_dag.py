@@ -12,7 +12,6 @@ from airflow.decorators import dag, task, task_group
 from airflow.models.param import Param
 from airflow.utils.task_group import TaskGroup
 from airflow.utils.dates import days_ago
-from google.cloud import storage
 from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateExternalTableOperator
 import sqlalchemy
 
@@ -20,7 +19,7 @@ from src.shared import config_logger, reformat_json_to_parquet
 from src.download_ticker_data import DownloadTickerData
 from src.download_etf_data import DownloadETFData
 from src.fetch_symbols import FetchSymbols
-from src.gc_functions import upload_to_gcs, create_bq_external_table_operator
+from src.gc_functions import upload_to_gcs, blob_exists, create_bq_external_table_operator
 from src.load_ticker_data_dlt import LoadTickerData
 
 config_logger('info')
@@ -53,7 +52,6 @@ def fetch_file_paths(dirpath, ext):
         if f.endswith(f'.{ext}'):
             fpaths.append(os.path.join(dirpath, f))
     return fpaths
-
 
 @dag(
     schedule=None,
@@ -141,18 +139,21 @@ def ingest_raw_data_dag():
         logger.info(f"Creating external talbe in BQ for {ticker}")
         fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
         object_name=f"{source}/{os.path.basename(fpath)}"
-        fmt=os.path.basename(fpath).split('.')[1].upper()
-        table_name = f'{source}_{ticker}'
-        logger.info(f"Creating external table based on {fmt} file gs://{BUCKET}/{object_name}")
-        operator = create_bq_external_table_operator(
-            projectID=PROJECT_ID,
-            bucket=BUCKET,
-            object_name=object_name,
-            dataset=BIGQUERY_DATASET,
-            table=table_name,
-            format=fmt)
-        operator.execute(context=context)
-        logger.info(f"Created table in BQ: {BIGQUERY_DATASET}.{table_name}")
+        if blob_exists(BUCKET, object_name):
+            fmt=os.path.basename(fpath).split('.')[1].upper()
+            table_name = f'{source}_{ticker}'
+            logger.info(f"Creating external table based on {fmt} file gs://{BUCKET}/{object_name}")
+            operator = create_bq_external_table_operator(
+                projectID=PROJECT_ID,
+                bucket=BUCKET,
+                object_name=object_name,
+                dataset=BIGQUERY_DATASET,
+                table=table_name,
+                format=fmt)
+            operator.execute(context=context)
+            logger.info(f"Created table in BQ: {BIGQUERY_DATASET}.{table_name}")
+        else:
+            logger.warning(f"Blob {object_name} does not exist")
         return ticker
         
     @task
