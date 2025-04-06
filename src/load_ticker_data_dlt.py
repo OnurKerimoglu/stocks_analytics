@@ -12,6 +12,7 @@ class LoadTickerData():
             self,
             full_load=False,
             dest='duckdb',
+            dataset_name='stocks_raw',
             dev_mode=True,
             log_level='info'):
         # configure and start logger

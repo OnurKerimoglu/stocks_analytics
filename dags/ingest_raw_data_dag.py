@@ -32,7 +32,8 @@ logger.info(f'AIRFLOW_HOME: {rootpath0}')
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 BUCKET = os.environ.get("GCP_GCS_BUCKET")
 # BIGQUERY_DATASET = os.environ.get("GCP_BIGQUERY_DATASET", 'stocks_dev')
-BIGQUERY_DATASET = 'stocks_dev'
+BIGQUERY_DATASET_EXT = 'stocks_raw_ext'
+BIGQUERY_DATASET_DLT = 'stocks_raw'
 
 def get_local_raw_data_path(source, ticker):
     if source == 'price':
@@ -147,11 +148,11 @@ def ingest_raw_data_dag():
                 projectID=PROJECT_ID,
                 bucket=BUCKET,
                 object_name=object_name,
-                dataset=BIGQUERY_DATASET,
+                dataset=BIGQUERY_DATASET_EXT,
                 table=table_name,
                 format=fmt)
             operator.execute(context=context)
-            logger.info(f"Created table in BQ: {BIGQUERY_DATASET}.{table_name}")
+            logger.info(f"Created table in BQ: {BIGQUERY_DATASET_EXT}.{table_name}")
         else:
             logger.warning(f"Blob {object_name} does not exist")
         return ticker
@@ -162,6 +163,7 @@ def ingest_raw_data_dag():
         load_ticker = LoadTickerData(
             full_load=full_load,
             dest='bigquery',
+            dataset_name=BIGQUERY_DATASET_DLT,
             dev_mode=False,
             log_level='info')
         if source == 'etf':
