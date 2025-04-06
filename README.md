@@ -13,6 +13,8 @@
 ## Data Warehouse Design
 
 ## Tools and Technical Setup
+### First steps
+git clone --recursive git@github.com:OnurKerimoglu/stocks_analytics.git
 
 ### Terraform
 
