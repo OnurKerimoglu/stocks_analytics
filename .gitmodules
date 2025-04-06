@@ -1,0 +1,3 @@
+[submodule "dbt/stocks"]
+	path = dbt/stocks
+	url = git@github.com:OnurKerimoglu/stocks_dbt.git
