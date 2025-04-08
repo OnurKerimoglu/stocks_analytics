@@ -46,11 +46,11 @@ def transformation_dag():
     #     # bash_command='dbt build - models stocks.etf_holdings'
     #     bash_command=f"dbt run -s etf_holding_counts --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
     # )
-    vararg = r'{\"etf_symbol\": ' + r'\"{}\"'.format(ETF_symbol) + r'}'
+    vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
     etf_ticker_weights = BashOperator(
         task_id='etf_ticker_weights',
         # bash_command='dbt build - models stocks.etf_holdings'
-        # dbt run --select filtered_table --vars '{"etf_symbol": "IVV"}'
+        # dbt run -s etf_ticker_weights --vars '{etf_symbol: IVV}' --profiles-dir config        
         bash_command=f"dbt run -s etf_ticker_weights --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
     )
 
