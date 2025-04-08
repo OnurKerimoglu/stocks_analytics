@@ -60,9 +60,7 @@ def transformation_dag():
         # dbt run -s etf_ticker_combine --vars '{etf_symbol: IVV}' --profiles-dir config        
         bash_command=f"dbt run -s etf_tickers_combine --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
     )
-
-    # holding_counts
-    price_technicals
-    # price_technicals >> etf_ticker_weights
+    
+    price_technicals >> etf_ticker_weights
 
 dag_instance = transformation_dag()
