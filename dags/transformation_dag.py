@@ -41,11 +41,18 @@ def transformation_dag():
     ETF_symbol = '{{ params.ETF_symbol }}'
     logger.info(f'Running the ingest_raw_data_dag for {ETF_symbol}')
 
+    # TODO: move to another dag
+    price_technicals = BashOperator(
+        task_id='price_technicals_lastday',
+        bash_command=f"dbt run -s price_technicals_lastday  --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
+    )
+
     # holding_counts = BashOperator(
     #     task_id='holding_counts',
     #     # bash_command='dbt build - models stocks.etf_holdings'
     #     bash_command=f"dbt run -s etf_holding_counts --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
     # )
+
     vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
     etf_ticker_weights = BashOperator(
         task_id='etf_tickers_combine',
@@ -55,6 +62,7 @@ def transformation_dag():
     )
 
     # holding_counts
-    etf_ticker_weights
+    price_technicals
+    # price_technicals >> etf_ticker_weights
 
 dag_instance = transformation_dag()
