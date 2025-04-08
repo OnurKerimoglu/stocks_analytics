@@ -25,14 +25,14 @@ dbt_dir = os.path.join(rootpath, 'dbt', 'stocks_dbt')
     },
     params={
         'ETF_symbol': Param(
-            'QTOP',
+            'IVV',
             type='string',
             title='ETF Ticker symbol',
             description='Current options: QTOP (S&P Top 100), OEF (Nasdaq top 30), IVV (S&P 500)',
             enum=[
+                'IVV',
                 'QTOP',
-                'OEF',
-                'IVV'
+                'OEF'
             ],
         )
     }
@@ -48,10 +48,10 @@ def transformation_dag():
     # )
     vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
     etf_ticker_weights = BashOperator(
-        task_id='etf_ticker_weights',
-        # bash_command='dbt build - models stocks.etf_holdings'
-        # dbt run -s etf_ticker_weights --vars '{etf_symbol: IVV}' --profiles-dir config        
-        bash_command=f"dbt run -s etf_ticker_weights --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
+        task_id='etf_tickers_combine',
+        # bash_command='dbt build - models stocks.etf_ticker_weights'
+        # dbt run -s etf_ticker_combine --vars '{etf_symbol: IVV}' --profiles-dir config        
+        bash_command=f"dbt run -s etf_tickers_combine --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
     )
 
     # holding_counts
