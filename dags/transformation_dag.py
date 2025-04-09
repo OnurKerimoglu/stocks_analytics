@@ -61,6 +61,12 @@ def transformation_dag():
         bash_command=f"dbt run -s etf_tickers_combine --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
     )
     
-    price_technicals >> etf_ticker_weights
+    etf_sector_aggregates = BashOperator(
+        task_id='etf_sector_aggregates',        
+        bash_command=f"dbt run -s etf_sector_aggregates --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
+    )
+
+    price_technicals >> etf_ticker_weights >> etf_sector_aggregates
+
 
 dag_instance = transformation_dag()
