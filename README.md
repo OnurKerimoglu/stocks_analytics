@@ -62,17 +62,21 @@ For the details of the contents of etf_{etf_name} tables, see [ETF Transformatio
 [//]: <> (TODO: design?)
 
 ## Tools and Technical Setup
-### First steps
+### Cloning the repositories
 The repository should be cloned with the `--recursive` argument, i.e., `git clone --recursive git@github.com:OnurKerimoglu/stocks_analytics.git`, such that the [stocks_dbt](https://github.com/OnurKerimoglu/stocks_dbt.git) repository is pulled as a submodule into the `dbt` folder (see the [Airflow](#Airflow) section below for information on the integration of dbt with Airflow).
 
 ### Platform: Google Cloud
+The project is developed on the Google Cloud Platform. To manage provisioning of required services (so far Cloud Storage and Bigquery), Terraform is used as a Infrastructure as Code (IaC) tool.
+
 #### Terraform
+[Hashicorp Terraform](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started/infrastructure-as-code) is used to manage Google Cloud services. Required files can be found in the [terraform](terraform) directory. 
+
 
 ### dlt
-Some part of the ingestion is done via dlt (data load tool), orchestrated with Airflow. 
+Some part of the ingestion, specifically, loading the raw ticker data (info and price) to the datawarehouse is done via [dlt (data load tool)](https://dlthub.com/), orchestrated with [Airflow](#Airflow) (see [Data Ingestion DAG](#data-ingestion) below for the process details). 
 
 ### dbt
-Transformations are done with dbt (data build tool), orchestrated with Airflow.
+Data transformations are done with [dbt (data build tool) -core](https://docs.getdbt.com/docs/core/installation-overview), orchestrated with [Airflow](#Airflow) (see [Data Transformations](#data-transformations) below for the process details).
 
 ### Airflow
 
