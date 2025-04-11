@@ -1,17 +1,65 @@
 # Stocks Analytics
 
 ## Problem Description
+Data and visualisations to help understand the value and performance of stocks, and particularly of [ETF](https://en.wikipedia.org/wiki/Exchange-traded_fund)'s are not freely available, although many subscription-based (payed) platforms for the purpose exists. TODO: examples, etc
+
+## Solution Architecture
+TODO: draw.io diagram
 
 ## Data Sources
 
-### ETF Holding Compositions
-
-### Stock Prices
+### ETF Compositions
+These data provide, most importantly, the ticker symbol, name, and weight of the company held by the ETF (TODO: describe etf_scraper function call)
 
 ### Stock Information
+These refer to the fundamental information about a given company, such as the sector, market capitalization, earnings per share, etc. (TODO: describe yfinance function call)
 
-## Data Lake & Warehouse Design
-All the raw data are stored in GCS. 
+### Stock Prices
+These refer to the historic daily stock prices (open, close, day-low, day-high) and trading volumes. (TODO: describe yfinance function call)
+
+## Data Lake & Warehouse
+
+### Data Lake
+All the raw data are stored as .parquet files in a GCS bucket, split into three folders: 
+
+<img src="documentation/images/data_lake_structure.png" alt="data_lake_structure" width="120"/>
+
+Contents of these folders are probably self-evident (see the previous section for the contents of files and how they are generated):
+- etf: .parquet files for each of the ETF's being tracked. See the [ETF Compositions](#etf-compositions) 
+- info: .parquet files for each company ticker held by any ETF (no duplicates for holdings contained by multiple ETF's). See the [Stock Information](#stock-information) section above for the contents.
+- prices: same as for the info files, but containing the daily price history of the company. See the [Stock Prices](#stock-prices) section above for the contents.
+
+
+
+### Data Warehouse
+
+The data warehouse contains 3 dataset groups, 2 of which have dev/staging and production variants (therefore totalling 5 datasets):
+
+<img src="documentation/images/data_warehouse_structure.png" alt="data_warehouse_structure" width="200"/>
+
+These dataset groups contain following tables:
+
+#### stocks_raw_ext
+contains an external table for each .parquet file in the [data lake](#data-lake), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow).
+
+#### stocks_raw_staging (dev) and stocks_raw (prod)
+these tables are created by the [dlt (data load tool)](#dlt), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
+- etfs: concateneted [ETF Compositions](#etf-compositions) for all ETF's being tracked, as identified by `fund_ticker` column
+- stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
+- stock_price: concatenated [Stock Prices](#stock-prices) for all company tickers being tracked, as identified by `symbol` column
+
+This design follows the [star schema](https://en.wikipedia.org/wiki/Star_schema), where the stock_price is a rapidly changing fact table, and the etfs and stock_info are the slower-changing dimensions tables.
+
+#### stocks_refined_dev and stocks_refined_prod:
+these tables are transformed data produced by the [dbt (data build tool)](#dbt), called from [Data Transformation DAG's](#data-transformation), orchestrated by [Airflow](#Airflow). They comprise the following tables:
+- etf_{etf_name}_sector_aggregates: for each ETF being tracked, sectoral aggregations: in particular, sum of weights of tickers held by the ETF in each sector 
+- etf_{etf_name}_tickers_combined: for each ETF being tracked, combination of select fields from raw etf and info tables, and the price_technicals_last_day (see below)
+- etf_{etf_name}_top_ticker_prices: for each ETF being tracked, price (close) of tickers held by the ETF.
+- price_technicals_lastday: for each ticker tracked by any ETF, the technical indicators for the last day. 
+
+For the details of the contents of etf_{etf_name} tables, see [ETF Transformations DAGs](#etf-transformations-dag), and for the others (currently only 'price_technicals_lastday'), see [Ticker Transformations DAG](#ticker-transformations-dag).
+
+[//]: <> (TODO: design?)
 
 ## Tools and Technical Setup
 ### First steps
