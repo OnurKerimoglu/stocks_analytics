@@ -10,7 +10,8 @@
 
 ### Stock Information
 
-## Data Warehouse Design
+## Data Lake & Warehouse Design
+All the raw data are stored in GCS. 
 
 ## Tools and Technical Setup
 ### First steps
@@ -86,3 +87,10 @@ where BR stands for the Bollinger Recommendation, P is the (closing) Price, $\mu
 The []()
 
 <img src="documentation/images/airflow_etf_transformations_dag.png" alt="etf transformations dag" width="320"/>
+
+
+## Metabase Dashboard
+For dashboards, [Metabase Open Source](https://www.metabase.com/start/oss/) is used.  For each ETF, a separate dashboard is created. For instance, for IVV, here is how the dashboard looks like:
+
+<img src="documentation/images/Dashboard_Metabase.png" alt="etf transformations dag" width="800"/>
+
