@@ -105,7 +105,7 @@ client_email = ****
 ## Data Ingestion
 
 ### Ingestion DAG
-The ingestion DAG, i.e., [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) looks like this:
+The ingestion DAG, i.e., [ingest_raw_data_dag](dags/ingest_raw_data_dag.py), comprises all ingestion-tasks required for a given ETF (provided as an input argument `ETF_symbol`), so it is somewhat complex: 
 
 <!---
 ![airflow ingestion dag](documentation/images/airflow_ingestion_dag.png)
@@ -113,9 +113,16 @@ The ingestion DAG, i.e., [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) look
 
 <img src="documentation/images/airflow_ingestion_dag.png" alt="ingestion dag" width="1200"/>
 
-The DAG comprises 3 main branches: 
+The DAG has 2 main branches: one to process ETF data (branch A), another to process the ticker data (branch B), which in turn branches into two, that process ticker prices (branch B.A) and ticker information (branch B.B). In this DAG, all tasks are all python functions with `@task` decorator (making them classical `PythonOperator`s). Some tasks are used multiple times in these branches, therefore it makes sense to describe the tasks at a definition (and not instantiation) level (in brackets the branches that contains the tasks are indicated)
 
-- 
+- **get_etf_data (A, B.A, B.B)**: initializes the `DownloadTickerData` class (in [download_ticker_data.py](src/download_ticker_data.py)) for the `ETF_symbol` (specified as the input argument of the DAG), downloads and stores the entire table to local `data/etf/{ETF_symbol}.parquet` file (folder will be created if not exists), and symbols to `data/{ETF_symbol}.csv` file to facilitate human access
+- **fetch_symbols (B.A, B.B)**: initializes the `FetchSymbols` class (in [fetch_symbols](src/fetch_symbols.py)) with the filepath of the locally stored csv file (see get_etf_data task above), and returns the ticker symbols as a list 
+- **get_ticker_price/info (B.A/B.B)**: both of these tasks are called with the ticker lists obtained from the fetch_symbols tase as input arguments, therefore are dynamically mapped to the elements of the list. Each of these tasks then initialize the `DownloadTickerData` class (in [download_ticker_data](src/download_ticker_data.py) module for a single ticker symbol. Then, the _price task runs the download_prices() method of the class,
+- **reformat_json_to_pq (B.B)**:
+- **ul_to_gcs (A, B.A, B.B)**:
+- **create_bq_table (A, B.A, B.B)**:
+- **create_bq_table (A, B.A, B.B)**:
+- **remove_local (A, B.A, B.B)**:
 
 ## Data Transformations
 
