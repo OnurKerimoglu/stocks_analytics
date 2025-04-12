@@ -1,13 +1,15 @@
 # Stocks Analytics
 
-## Problem Description
+## Motivation and Scope of the Project
 
-Understanding the performance of stocks, and particularly of [ETF](https://en.wikipedia.org/wiki/Exchange-traded_fund)'s is not straightforward. Decision to buy or sell stocks or ETF's requires consideration of many factors, such as various financial metrics (a.k.a. [fundamental analysis](https://en.wikipedia.org/wiki/Fundamental_analysis)), and the past price behavior (a.k.a. [technical analysis](https://en.wikipedia.org/wiki/Technical_analysis)) of companies (or their collection in case of ETF's). For the so called day-traders, the technical analysis may outweight any other factor, and an automatized algorithmic trading strategy may work better, however, a longer-term investor may want to conduct more comprehensive analyses, which requires bringing various data sources together. Purpose of this project is to help the latter group, by providing a platform that facilitates analyzing ETFs at the first place, for which available tools are even scarcer, but also individual stocks at a later point. Following challenges can be outlined: 
-- *Data sources with different time scales*: the price data are available essentially at real time, whereas other metrics, such as financial statements are made available quarterly or annually. Composition of ETF's can also change over time, more frequently for the actively-managed ETF's and less frequently for index-ETF's. 
-- *Monitoring platform*: what an invester needs is often not a one-off analysis, but more of a monitoring platform: typically an invester would like to gain insights at regular intervals. Therefore the underlying data, its processing and visualization needs to be refreshed accordingly.
+Understanding the performance of stocks, and particularly of [ETF](https://en.wikipedia.org/wiki/Exchange-traded_fund)'s is not straightforward. Decision to buy or sell stocks or ETFs requires consideration of many factors, such as various financial metrics (a.k.a. [fundamental analysis](https://en.wikipedia.org/wiki/Fundamental_analysis)), and the past price behavior (a.k.a. [technical analysis](https://en.wikipedia.org/wiki/Technical_analysis)) of companies (or their collection in case of ETFs). For the day-traders, the technical analysis may outweight any other factor, and an automated algorithmic trading strategy may be more suitable. However, a long-term investor often need more comprehensive analyses, requiring the integration of various data sources. My goal in this project has been to assist the latter group (which includes myself!), by building a platform that facilitates analyzing stock market assets. Key challenges can be outlined as follows: 
+- *Data sources with different time scales*: the price data are available essentially at real time, whereas other metrics, such as financial statements are made available quarterly or annually. ETF compositions can also change over time, more frequently for the actively-managed ETFs and less frequently for index-ETFs. 
+- *Monitoring platform*: what an investor needs is often not a one-off analysis, but more of a monitoring platform: typically an investor would like to gain insights at regular intervals. Therefore the underlying data, its processing and visualization needs to be refreshed accordingly.
 - *Scalability*: Handling a few dozen or hundred stocks could be managed with classical backend-engineering methods, however, doing this at scale (e.g., potentially thousands of stocks that need to be refreshed frequently) is facilitated by modern data-engineering tools, such as a data warehouse, distributed computing and orchestration solutions.
 
-Considering these challenges and computational costs of solving them, it is no surprise that there exist a plethora of subscription-based (payed) services that provide platforms to faciliate users with their investment decisions in the stock market. With this project, my aim is not to compete with these platforms (which probably requires quite some cloud resources), but mainly to experiment with the modern data-engineering tech-stack as part of a [Data Engineering Zoomcamp by the DataTalksClub](https://datatalks.club/blog/data-engineering-zoomcamp.html) (big shoutout to the DataTalksClub lecturers and community!). So far I have given the priority to the more complex problem of ETFs for which the freely available tools are even scarcer.
+Considering these challenges and computational costs of solving them, it is no surprise that there exist a plethora of subscription-based (paid) services have emerged to support investors. With this project, I obviously do not aim to compete with these platforms, which would require substantial cloud resources. Rather, my goal has been to explore and experiment with the modern data-engineering tech-stack as part of the [Data Engineering Zoomcamp by the DataTalksClub](https://datatalks.club/blog/data-engineering-zoomcamp.html) - big shout-out to the amazing DataTalksClub lecturers and community! 
+
+So far I have prioritized the more complex problem of ETFs for which the freely available tools are even scarcer. In the future, I am planning to extend the platform to support individual stock analysis, enhance both fundamental and technical analysis capabilities, introduce forecasting mechanisms, and experiment with LLM-based synthesis features. I’d love to hear from potential collaborators!
 
 ## Solution Architecture
 TODO: draw.io diagram
@@ -31,8 +33,8 @@ All the raw data are stored as .parquet files in a GCS bucket, split into three 
 <img src="documentation/images/data_lake_structure.png" alt="data_lake_structure" width="120"/>
 
 Contents of these folders are probably self-evident (see the previous section for the contents of files and how they are generated):
-- etf: .parquet files for each of the ETF's being tracked. See the [ETF Compositions](#etf-compositions) 
-- info: .parquet files for each company ticker held by any ETF (no duplicates for holdings contained by multiple ETF's). See the [Stock Information](#stock-information) section above for the contents.
+- etf: .parquet files for each of the ETFs being tracked. See the [ETF Compositions](#etf-compositions) 
+- info: .parquet files for each company ticker held by any ETF (no duplicates for holdings contained by multiple ETFs). See the [Stock Information](#stock-information) section above for the contents.
 - prices: same as for the info files, but containing the daily price history of the company. See the [Stock Prices](#stock-prices) section above for the contents.
 
 
@@ -50,7 +52,7 @@ contains an external table for each .parquet file in the [data lake](#data-lake)
 
 #### stocks_raw
 This dataset has two variants for development (suffix: _staging) and production environments (no suffix), where the tables are created by the [dlt (data load tool)](#dlt), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
-- etfs: concateneted [ETF Compositions](#etf-compositions) for all ETF's being tracked, as identified by `fund_ticker` column
+- etfs: concateneted [ETF Compositions](#etf-compositions) for all ETFs being tracked, as identified by `fund_ticker` column
 - stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
 - stock_price: concatenated [Stock Prices](#stock-prices) for all company tickers being tracked, as identified by `symbol` column
 
