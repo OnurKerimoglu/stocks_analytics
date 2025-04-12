@@ -1,6 +1,6 @@
 # Stocks Analytics
 
-## Motivation and Scope of the Project
+## Motivation and Scope
 
 Understanding the performance of stocks, and particularly of [ETF](https://en.wikipedia.org/wiki/Exchange-traded_fund)'s is not straightforward. Decision to buy or sell stocks or ETFs requires consideration of many factors, such as various financial metrics (a.k.a. [fundamental analysis](https://en.wikipedia.org/wiki/Fundamental_analysis)), and the past price behavior (a.k.a. [technical analysis](https://en.wikipedia.org/wiki/Technical_analysis)) of companies (or their collection in case of ETFs). For the day-traders, the technical analysis may outweight any other factor, and an automated algorithmic trading strategy may be more suitable. However, a long-term investor often need more comprehensive analyses, requiring the integration of various data sources. My goal in this project has been to assist the latter group (which includes myself!), by building a platform that facilitates analyzing stock market assets. Key challenges can be outlined as follows: 
 - *Data sources with different time scales*: the price data are available essentially at real time, whereas other metrics, such as financial statements are made available quarterly or annually. ETF compositions can also change over time, more frequently for the actively-managed ETFs and less frequently for index-ETFs. 
@@ -17,13 +17,10 @@ TODO: draw.io diagram
 ## Data Sources
 
 ### ETF Compositions
-These data provide, most importantly, the ticker symbol, name, and weight of the company held by the ETF (TODO: describe etf_scraper function call)
+ETF holding composition is acquired using python [ETF-Scraper](https://pypi.org/project/etf-scraper/) package. The data includes, most importantly, the ticker symbol, name, and weight of the company held by the ETF.
 
-### Stock Information
-These refer to the fundamental information about a given company, such as the sector, market capitalization, earnings per share, etc. (TODO: describe yfinance function call)
-
-### Stock Prices
-These refer to the historic daily stock prices (open, close, day-low, day-high) and trading volumes. (TODO: describe yfinance function call)
+### Stock Information and Prices
+These datasets are acquired via python [yfinance](https://pypi.org/project/yfinance/) package.  'Information' (or info in short) refers to the fundamental information about a given company, such as the sector, market capitalization, earnings per share, etc. Stock Prices refer to the historic daily stock prices (open, close, day-low, day-high) and trading volumes.
 
 ## Data Lake & Warehouse
 
