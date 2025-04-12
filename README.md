@@ -42,16 +42,16 @@ These dataset groups contain following tables:
 #### stocks_raw_ext
 contains an external table for each .parquet file in the [data lake](#data-lake), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow).
 
-#### stocks_raw_staging (dev) and stocks_raw (prod)
-these tables are created by the [dlt (data load tool)](#dlt), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
+#### stocks_raw
+This dataset has two variants for development (suffix: _staging) and production environments (no suffix), where the tables are created by the [dlt (data load tool)](#dlt), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
 - etfs: concateneted [ETF Compositions](#etf-compositions) for all ETF's being tracked, as identified by `fund_ticker` column
 - stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
 - stock_price: concatenated [Stock Prices](#stock-prices) for all company tickers being tracked, as identified by `symbol` column
 
 This design follows the [star schema](https://en.wikipedia.org/wiki/Star_schema), where the stock_price is a rapidly changing fact table, and the etfs and stock_info are the slower-changing dimensions tables.
 
-#### stocks_refined_dev and stocks_refined_prod:
-these tables are transformed data produced by the [dbt (data build tool)](#dbt), called from [Data Transformation DAG's](#data-transformation), orchestrated by [Airflow](#Airflow). They comprise the following tables:
+#### stocks_refined
+This dataset has also two variants for the development (indicated with _dev suffix) and production (indicated with _prod suffix) environments, and contains transformed data produced by the [dbt (data build tool)](#dbt), called from [Data Transformation DAG's](#data-transformation), orchestrated by [Airflow](#Airflow). They comprise the following tables:
 - etf_{etf_name}_sector_aggregates: for each ETF being tracked, sectoral aggregations: in particular, sum of weights of tickers held by the ETF in each sector 
 - etf_{etf_name}_tickers_combined: for each ETF being tracked, combination of select fields from raw etf and info tables, and the price_technicals_last_day (see below)
 - etf_{etf_name}_top_ticker_prices: for each ETF being tracked, price (close) of tickers held by the ETF.
@@ -59,7 +59,7 @@ these tables are transformed data produced by the [dbt (data build tool)](#dbt),
 
 For the details of the contents of etf_{etf_name} tables, see [ETF Transformations DAGs](#etf-transformations-dag), and for the others (currently only 'price_technicals_lastday'), see [Ticker Transformations DAG](#ticker-transformations-dag).
 
-[//]: <> (TODO: design?)
+As the [stocks_raw](#stocks_raw) datasets, this dataset follows a star schema, where the price_technicals_lastday is the rapidly changing fact table, and the etf_{etf_name}_* tables are the dimension tables.
 
 ## Tools and Technical Setup
 ### Cloning the repositories
@@ -70,7 +70,6 @@ The project is developed on the Google Cloud Platform. To manage provisioning of
 
 #### Terraform
 [Hashicorp Terraform](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started/infrastructure-as-code) is used to manage Google Cloud services. Required files can be found in the [terraform](terraform) directory. 
-
 
 ### dlt
 Some part of the ingestion, specifically, loading the raw ticker data (info and price) to the datawarehouse is done via [dlt (data load tool)](https://dlthub.com/), orchestrated with [Airflow](#Airflow) (see [Data Ingestion DAG](#data-ingestion) below for the process details). 
@@ -109,18 +108,18 @@ The ingestion DAG, i.e., [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) look
 
 <img src="documentation/images/airflow_ingestion_dag.png" alt="ingestion dag" width="1200"/>
 
-Involved tasks are as follows:
+The DAG comprises 3 main branches: 
 
 - 
 
 ## Data Transformations
 
 ### Ticker Transformations DAG
-The [ticker_transformations_dag](dags/ticker_transformations_dag.py)) contains a single dbt task, [price_technicals_lastday.sql](dbt/stocks_dbt/models/stocks/price_technicals_lastday.sql):
+The [ticker_transformations_dag](dags/ticker_transformations_dag.py)) contains a single dbt task, which is a `BashOperator`:
 
 <img src="documentation/images/airflow_ticker_transformations_dag.png" alt="ticker transformations dag" width="150"/>
 
-The purpose of this task is, for each ticker in the stocks_raw.stocks_prices table, calculating technical indicators that can be summarized for the last day available (so that one record can be produced per ticker in the target table), and write these results into the stocks_refined_(dev/prod).price_technicals_lastday table. Currently, the only indicator calculated is the (Bollinger Band Strategy)[https://en.wikipedia.org/wiki/Bollinger_Bands], according to which,
+This `BashOperator` issues a dbt CLI command to run [price_technicals_lastday.sql](dbt/stocks_dbt/models/stocks/price_technicals_lastday.sql), purpose of which is, for each ticker in the stocks_prices table in the [stocks_raw](#stocks_raw) dataset, calculating technical indicators that can be summarized for the last day available (so that one record can be produced per ticker in the target table), and write these results into the, price_technicals_lastday table in the [stocks_refined](#stocks_refined) datasets. Currently, the only indicator calculated is the (Bollinger Band Strategy)[https://en.wikipedia.org/wiki/Bollinger_Bands], according to which,
 
 $$
 \textrm{BR} = 
@@ -136,10 +135,14 @@ $$
 where BR stands for the Bollinger Recommendation, P is the (closing) Price, $\mu_n(P)$ and $\sigma_n(P)$ are the $n$-day rolling average and standard deviation of Price for the time period, and $K$ is a factor (in the current implementation, $n$=30, $K$=2). As in the current implementation we need the BR only for the last day, the calculation truncates to simple average and standard deviation calculations for the chosen period ($n$=30 days).  
 
 ### ETF Transformations DAG
-The []()
+The [ETF Transformations DAG](#etf-transformations-dag) takes an input parameter `ETF_symbol` when triggering, and is comprised of 3 `BashOperator` tasks, 2 of which branches from the first task, and can run in parallel:
 
 <img src="documentation/images/airflow_etf_transformations_dag.png" alt="etf transformations dag" width="320"/>
 
+These `BashOperator` tasks run dbt models that have names identical to the calling tasks:
+- [etf_tickers_combine](dbt/stocks_dbt/models/stocks/etf_tickers_combine.sql): This model, first filters the ticker symbols, weights and sectors of companies that are held for a chosen ETF (as specified the input parameter) from the etfs table (in [stocks_raw](#stocks_raw) datasets), then combines these with a subset of fields from the stock_info table (in [stocks_raw](#stocks_raw) datasets) and price_technicals_lastday table (in the [stocks_refined](#stocks_refined) datasets) (see [Ticker Transformations DAG](#ticker-transformations-dag))
+- [etf_sector_aggregates](dbt/stocks_dbt/models/stocks/etf_sector_aggregates.sql): this model builds on the etf_tickers_combine model, basically by applyting various aggregation functions to the fields of this table over sectors.
+- [etf_top_ticker_prices](dbt/stocks_dbt/models/stocks/etf_top_ticker_prices.sql): this model mainly choses the most important (by weight) tickers for the specified ETF (i.e., input parameter) from the stock_prices table (in [stocks_raw](#stocks_raw) dataset) by joining with the etf_tickers_combine table created by the first task.
 
 ## Metabase Dashboard
 For dashboards, [Metabase Open Source](https://www.metabase.com/start/oss/) is used.  For each ETF, a separate dashboard is created. For instance, for IVV, here is how the dashboard looks like:
