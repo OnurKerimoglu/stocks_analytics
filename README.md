@@ -1,6 +1,6 @@
-<font size="+12"><center>
-    Stocks Analytics
-</center></font>
+<h1 align="center">
+    <strong>Stocks Analytics: A Platform for Monitoring Stocks and ETFs</strong>
+</h1>
 
 # Motivation and Scope
 
