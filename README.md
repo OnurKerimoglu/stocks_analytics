@@ -137,7 +137,7 @@ This `BashOperator` issues a dbt CLI command to run [price_technicals_lastday.sq
 
 $$
 \textrm{BR} = 
-\left\{
+\left\lbrace
   \begin{array}{ c l }
     \textrm{sell} & \quad \textrm{if } P \geq \mu_{n}(P) + K\sigma_{n}(P) \\
     \textrm{buy} & \quad \textrm{if } P \leq \mu_{n}(P) - K\sigma_{n}(P) \\
