@@ -12,7 +12,18 @@ Considering these challenges and computational costs of solving them, it is no s
 So far I have prioritized the more complex problem of ETFs for which the freely available tools are even scarcer. In the future, I am planning to extend the platform to support individual stock analysis, enhance both fundamental and technical analysis capabilities, introduce forecasting mechanisms, and experiment with LLM-based synthesis features. I’d love to hear from potential collaborators!
 
 ## Solution Architecture
-TODO: draw.io diagram
+
+Here is a high-level overview of the solution architecture: 
+
+<img src="documentation/images/Solution_Architecture_GCP.png" alt="data_lake_structure" width="800"/>  
+<br/><br/>
+
+3 main environments can be identified:
+1. A local development environment (green box): this is where the code is developed/maintained and necessary cloud services (via [Terraform](#terraform)) are managed
+2. The cloud environment (blue box): here [Google Cloud Platform](https://cloud.google.com/), where the data storage is first temporarily in the local file system, then persisted in cloud services, source code is containerized with [Docker](https://www.docker.com/) (see [Docker](Docker/airflow)), in which data is processed
+3. [Metabase Dashboards](#metabase-dashboard) (orange box) served to public
+
+In the following sections, detailed descriptions of [data sources](#data-sources), [data lake and warehouse](#data-lake--warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally the [Metabase dashboard](#metabase-dashboard) are provided. 
 
 ## Data Sources
 
