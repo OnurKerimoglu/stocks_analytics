@@ -181,7 +181,7 @@ def ingest_raw_data_dag():
             'parquet')
         logger.info(f"Found {len(fpaths)} to remove")
         for fpath in fpaths:
-            # os.remove(fpath)
+            os.remove(fpath)
             logger.info(f"Removed {fpath}")
         return 'done'
 
