@@ -22,10 +22,10 @@ Here is a high-level overview of the solution architecture:
 
 3 main environments can be identified:
 1. A local development environment (green box): this is where the code is developed/maintained and necessary cloud services (via [Terraform](#terraform)) are managed
-2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/), where the data storage is first temporarily in the local file system, then persisted in cloud services, source code is containerized with [Docker](https://www.docker.com/) (see [Docker](Docker/airflow)), in which data is processed
+2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is ran through a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed
 3. [Metabase Dashboards](#metabase-dashboard) (orange box) served to public
 
-In the following sections, detailed descriptions of [data sources](#data-sources), [data lake and warehouse](#data-lake--warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally the [Metabase dashboard](#metabase-dashboard) are provided. 
+In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally the [Metabase dashboard](#metabase-dashboard) are provided. 
 
 # Data Sources
 
@@ -35,7 +35,40 @@ ETF holding composition is acquired using python [ETF-Scraper](https://pypi.org/
 ## Stock Information and Prices
 These datasets are acquired via python [yfinance](https://pypi.org/project/yfinance/) package.  'Information' (or info in short) refers to the fundamental information about a given company, such as the sector, market capitalization, earnings per share, etc. Stock Prices refer to the historic daily stock prices (open, close, day-low, day-high) and trading volumes.
 
-# Data Lake & Warehouse
+# Cloud Services
+
+The project is developed on the [Google Cloud Platform](https://cloud.google.com). To manage provisioning of required services, I used
+(i.e., Cloud Storage, Bigquery and Cloud Compute), [Hashicorp Terraform](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started/infrastructure-as-code) as a Infrastructure as Code (IaC) tool. Required files can be found in the [terraform](terraform) directory. 
+
+
+For being able to manage (create/destroy) the employed services, I created a service account with following roles:
+- BigQuery Admin
+- Compute Instance Admin (v1)
+- Compute Network Admin
+- Compute ORganization Firewall Policy Admin
+- Compute Security Admin
+- Create Service Accounts
+- Storage Admin
+
+## Compute Instance
+For setting up terraform to create the compute instance to host airflow, [this resource](https://cloud.google.com/blog/products/data-analytics/different-ways-to-run-apache-airflow-on-google-cloud) has been helpful. I used n2d-standard-2 instance (2 vCPUs, 8 GB Memory) (see: [variables.tf](terraform/variables.tf)) with 20 GB disk size, and [Container-Optimized OS (COS)](https://cloud.google.com/container-optimized-os/docs) as the operating system (see: [google_compute_instance.tf](terraform/modules/google_compute_engine/google_compute_instance.tf)). Although COS comes with a preinstalled docker, it does not include the compose plugin, which therefore needs to be installed manually:
+``` 
+DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+CLI_PLUGINS=/var/lib/docker/cli-plugins
+mkdir -p $DOCKER_CONFIG
+sudo mkdir -p $CLI_PLUGINS
+sudo curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-x86_64 -o $CLI_PLUGINS/docker-compose
+sudo chmod -R 755 /var/lib/docker
+ln -s $CLI_PLUGINS $DOCKER_CONFIG/cli-plugins 
+```
+
+Finally, the key of the service-account needs to be downloaded and copied to the VM instance:
+```
+gcloud compute scp ~/gcp-keys/<filename.json> stocks-scheduler:
+```
+then inside the VM, move the file to the expected location with `mkdir gcp-keys; mv ~/<filename.json> gcp-keys`.
+
+See section: [Airflow](#airflow) for the instructions on setting up the Airflow environment.
 
 ## Data Lake
 All the raw data are stored as .parquet files in a GCS bucket, split into three folders: 
@@ -82,12 +115,6 @@ As the [stocks_raw](#stocks_raw) datasets, this dataset follows a star schema, w
 # Tools and Technical Setup
 ## Cloning the repositories
 The repository should be cloned with the `--recursive` argument, i.e., `git clone --recursive git@github.com:OnurKerimoglu/stocks_analytics.git`, such that the [stocks_dbt](https://github.com/OnurKerimoglu/stocks_dbt.git) repository is pulled as a submodule into the `dbt` folder (see the [Airflow](#Airflow) section below for information on the integration of dbt with Airflow).
-
-## Cloud platform: Google Cloud
-The project is developed on the Google Cloud Platform. To manage provisioning of required services (so far Cloud Storage and Bigquery), Terraform is used as a Infrastructure as Code (IaC) tool.
-
-### Terraform
-[Hashicorp Terraform](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started/infrastructure-as-code) is used to manage Google Cloud services. Required files can be found in the [terraform](terraform) directory. 
 
 ## dlt
 Some part of the ingestion, specifically, loading the raw ticker data (info and price) to the datawarehouse is done via [dlt (data load tool)](https://dlthub.com/), orchestrated with [Airflow](#Airflow) (see [Data Ingestion DAG](#data-ingestion) below for the process details). 
