@@ -11,6 +11,12 @@ variable "project" {
   default     = "stocks-455113"
 }
 
+variable "zone" {
+  description = "Zone"
+  #Update the below to your desired region
+  default     = "europe-west1-b"
+}
+
 variable "region" {
   description = "Region"
   #Update the below to your desired region
@@ -38,4 +44,16 @@ variable "gcs_bucket_name" {
 variable "gcs_storage_class" {
   description = "Bucket Storage Class"
   default     = "STANDARD"
+}
+
+variable "gce_vm1_service_name" {
+  description = "Compute Engine VM1 Name"
+  #Update the below to a unique bucket name
+  default     = "stocks-scheduler"
+}
+
+variable "gce_vm1_machine_type" {
+  description = "Compute Engine VM1 Machine Type"
+  #Update the below to a unique bucket name
+  default     = "n2d-standard-2"
 }
