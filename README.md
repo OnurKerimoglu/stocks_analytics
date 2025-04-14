@@ -142,6 +142,9 @@ client_email = ****
 ``` 
 3. no additional configuration step is needed for dbt. For info, the dbt models are made available to Airflow while building the container with [docker-compose.yaml](Docker/airflow/docker-compose.yaml) by mounting the `dbt` folder  to `/opt/airflow/dbt`, which contains the dbt repository [stocks_dbt](https://github.com/OnurKerimoglu/stocks_dbt.git) as a submodule, which in turn contains the (profiles.yml) file inside a [config](dbt/stocks/dbt/config) folder (which by default is located under the dbt folder, e.g., $HOME/.dbt on Unix systems.). This non-default location for the profiles.yml file requires its specification while making a call to the dbt client (e.g., as in `bash_command=f"dbt run -s <model-name>  --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"`, where, `dbt_dir` points to `/opt/airflow/dbt/stocks_dbt`). 
 
+4. (If the Airflow is hosted on a remote machine): the webserver port needs to be forwarded to a `local-port`, from which Airflow UI can be displayed. On a terminal `ssh -L <local-port>:localhost:8081 <user>@stocks-scheduler -N`
+
+
 # Data Processing Pipelines
 ## Data Ingestion
 
