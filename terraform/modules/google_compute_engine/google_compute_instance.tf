@@ -7,9 +7,9 @@ resource "google_compute_instance" "default" {
 
   boot_disk {
     initialize_params {
-      image = "debian-cloud/debian-11"
+      image = "cos-cloud/cos-stable-117-18613-164-98"
       type  = var.boot_disk_type
-      size  = 80
+      size  = 20
     }
   }
 
