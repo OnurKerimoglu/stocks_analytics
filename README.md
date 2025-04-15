@@ -197,12 +197,20 @@ The [etf_transformations_dag](dags/etf_transformations_dag.py) takes an input pa
 <img src="documentation/images/airflow_etf_transformations_dag.png" alt="etf transformations dag" width="320"/>
 
 These `BashOperator` tasks run dbt models that have names identical to the calling tasks:
-- [etf_tickers_combine](dbt/stocks_dbt/models/stocks/etf_tickers_combine.sql): This model, first filters the ticker symbols, weights and sectors of companies that are held for a chosen ETF (as specified the input parameter) from the etfs table (in [stocks_raw](#stocks_raw) datasets), then combines these with a subset of fields from the stock_info table (in [stocks_raw](#stocks_raw) datasets) and price_technicals_lastday table (in the [stocks_refined](#stocks_refined) datasets) (see [Ticker Transformations DAG](#ticker-transformations-dag))
+- [etf_tickers_combine](dbt/stocks_dbt/models/stocks/etf_tickers_combine.sql): This model first filters the ticker symbols, weights and sectors of companies that are held for a chosen ETF (as specified the input parameter) from the etfs table (in [stocks_raw](#stocks_raw) datasets), then combines these with a subset of fields from the stock_info table (in [stocks_raw](#stocks_raw) datasets) and price_technicals_lastday table (in the [stocks_refined](#stocks_refined) datasets), and stores the result in Table: `etf_{ETF_symbol}_tickers_combined` (see [Ticker Transformations DAG](#ticker-transformations-dag))
 - [etf_sector_aggregates](dbt/stocks_dbt/models/stocks/etf_sector_aggregates.sql): this model builds on the etf_tickers_combine model, basically by applyting various aggregation functions to the fields of this table over sectors.
 - [etf_top_ticker_prices](dbt/stocks_dbt/models/stocks/etf_top_ticker_prices.sql): this model mainly choses the most important (by weight) tickers for the specified ETF (i.e., input parameter) from the stock_prices table (in [stocks_raw](#stocks_raw) dataset) by joining with the etf_tickers_combine table created by the first task.
 
 ## Metabase Dashboard
-For developing the dashboards, I used [Metabase Open Source](https://www.metabase.com/start/oss/). I am planning to migrate to [Metabase Cloud](https://www.metabase.com/cloud/) but some technical error occured (apparnetly the version of the  Docker image is higher than the cloud version). As soon as the problem is resolved, I will post a link here. Until then, just to give an idea, here is a screenshot of the dashboard from my local Metabase instance for the ETF: [IVV](https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf):
+For developing the dashboards, I used [Metabase Open Source](https://www.metabase.com/start/oss/), and for publishing I migrated to [Metabase Cloud](https://www.metabase.com/cloud/). As an example, for ETF: [IVV](https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf), here is the ['dashboard](https://stocks-analytics.metabaseapp.com/public/dashboard/c002f7a9-9418-4acb-a9b6-54b9171a2c9c). It should look something like this:
 
 <img src="documentation/images/Dashboard_Metabase.png" alt="etf transformations dag" width="800"/>
+
+
+### Explanation of Panels
+
+- *Top 10 Tickers by Weight*: This list is simply the top 10 rows of the `etf_{ETF_symbol}_tickers_combined` table, sorted by `weight`, in descending order
+- *Total Weight of Tickers per Sector*: This pie chart is based on a metabase 'question', which calculates adjusted weights of sectors in  `etf_IVV_sector_aggregates` table by multiplying the weights by $\frac{100}{\Sigma{w}}$, where $w$ are the original weights. This way, the adjusted weights presented in this chart always sum up to 100, even if there have been errors in fetching/processing some ticker data
+- *Bollinger Recommendation for Tickers*: This pie chart reflects the counts of tickers for each BR class (see [Ticker Transofmrations](#ticker-transformations-dag)), as obtained with grouping by `bollinger_recommendation` field from the table `etf_{ETF_symbol}_tickers_combined` 
+- *Time-Series of Top Tickers*: these are time series of top 10 tickers (filtered by weight rank) for the past 3 months (filtered by Date) from the table `etf_{ETF_symbol}_top_ticker_prices` 
 
