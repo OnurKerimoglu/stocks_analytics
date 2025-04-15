@@ -13,10 +13,13 @@ data/*.csv
 !data/*.default_stocks.csv
 
 Docker/airflow/logs/*
+*.env
 
 terraform/terraform.tfstate*
 terraform/.terraform*
+terraform/plan_*
 
 dbt/logs/*
 
 *.duckdb
+metabase/*
