@@ -132,7 +132,7 @@ Data transformations are done with [dbt (data build tool) -core](https://docs.ge
 
 2. export dlt_settings: In Airflow UI, under Admin > Variables create a `dlt_secrets_toml' variable with the contents of the secret.toml (under the default ~/.dlt folder), i.e.
 ```
-destination.bigquery]
+[destination.bigquery]
 location = ****
 
 [destination.bigquery.credentials]
