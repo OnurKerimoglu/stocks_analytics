@@ -53,13 +53,13 @@ For being able to manage (create/destroy) the employed services, I created a ser
 ## Compute Instance
 For setting up terraform to create the compute instance to host airflow, [this resource](https://cloud.google.com/blog/products/data-analytics/different-ways-to-run-apache-airflow-on-google-cloud) has been helpful. I used n2d-standard-2 instance (2 vCPUs, 8 GB Memory) (see: [variables.tf](terraform/variables.tf)) with 20 GB disk size, and [Container-Optimized OS (COS)](https://cloud.google.com/container-optimized-os/docs) as the operating system (see: [google_compute_instance.tf](terraform/modules/google_compute_engine/google_compute_instance.tf)). Although COS comes with a preinstalled docker, it does not include the compose plugin, which therefore needs to be installed manually:
 ``` 
-DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
-CLI_PLUGINS=/var/lib/docker/cli-plugins
-mkdir -p $DOCKER_CONFIG
-sudo mkdir -p $CLI_PLUGINS
-sudo curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-x86_64 -o $CLI_PLUGINS/docker-compose
-sudo chmod -R 755 /var/lib/docker
-ln -s $CLI_PLUGINS $DOCKER_CONFIG/cli-plugins 
+DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker};\
+CLI_PLUGINS=/var/lib/docker/cli-plugins;\
+mkdir -p $DOCKER_CONFIG;\
+sudo mkdir -p $CLI_PLUGINS;\
+sudo curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-x86_64 -o $CLI_PLUGINS/docker-compose;\
+sudo chmod -R 755 /var/lib/docker;\
+sudo ln -s $CLI_PLUGINS $DOCKER_CONFIG/cli-plugins 
 ```
 
 Finally, the key of the service-account needs to be downloaded and copied to the VM instance:
@@ -211,6 +211,6 @@ For developing the dashboards, I used [Metabase Open Source](https://www.metabas
 
 - *Top 10 Tickers by Weight*: This list is simply the top 10 rows of the `etf_{ETF_symbol}_tickers_combined` table, sorted by `weight`, in descending order
 - *Total Weight of Tickers per Sector*: This pie chart is based on a metabase 'question', which calculates adjusted weights of sectors in  `etf_IVV_sector_aggregates` table by multiplying the weights by $\frac{100}{\Sigma{w}}$, where $w$ are the original weights. This way, the adjusted weights presented in this chart always sum up to 100, even if there have been errors in fetching/processing some ticker data
-- *Bollinger Recommendation for Tickers*: This pie chart reflects the counts of tickers for each BR class (see [Ticker Transofmrations](#ticker-transformations-dag)), as obtained with grouping by `bollinger_recommendation` field from the table `etf_{ETF_symbol}_tickers_combined` 
+- *Bollinger Recommendation for Tickers*: This pie chart reflects the counts of tickers for each BR class (see [Ticker Transformations](#ticker-transformations-dag)), as obtained with grouping by `bollinger_recommendation` field from the table `etf_{ETF_symbol}_tickers_combined` 
 - *Time-Series of Top Tickers*: these are time series of top 10 tickers (filtered by weight rank) for the past 90 days (filtered by Date) from the table `etf_{ETF_symbol}_top_ticker_prices` 
 
