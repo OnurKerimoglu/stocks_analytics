@@ -51,7 +51,10 @@ For being able to manage (create/destroy) the employed services, I created a ser
 - Storage Admin
 
 ## Compute Instance
-For setting up terraform to create the compute instance to host airflow, [this resource](https://cloud.google.com/blog/products/data-analytics/different-ways-to-run-apache-airflow-on-google-cloud) has been helpful. I used n2d-standard-2 instance (2 vCPUs, 8 GB Memory) (see: [variables.tf](terraform/variables.tf)) with 20 GB disk size, and [Container-Optimized OS (COS)](https://cloud.google.com/container-optimized-os/docs) as the operating system (see: [google_compute_instance.tf](terraform/modules/google_compute_engine/google_compute_instance.tf)). Although COS comes with a preinstalled docker, it does not include the compose plugin, which therefore needs to be installed manually:
+For setting up terraform to create the compute instance to host airflow, [this resource](https://cloud.google.com/blog/products/data-analytics/different-ways-to-run-apache-airflow-on-google-cloud) has been helpful. I tested two VM's: 
+
+**VM1:**
+This is a n2d-standard-2 instance (single core with 2 vCPUs, 8 GB Memory) with 20 GB disk size, and [Container-Optimized OS (COS)](https://cloud.google.com/container-optimized-os/docs) as the operating system (see 'vm1' variables in: [variables.tf](terraform/variables.tf)). Although COS comes with a preinstalled docker, it does not include the compose plugin, which therefore needs to be installed manually:
 ``` 
 DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker};\
 CLI_PLUGINS=/var/lib/docker/cli-plugins;\
@@ -61,8 +64,13 @@ sudo curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker
 sudo chmod -R 755 /var/lib/docker;\
 sudo ln -s $CLI_PLUGINS $DOCKER_CONFIG/cli-plugins 
 ```
+This instance proved to be too limiting: as the DAG was running, it was not possible to establish an ssh connection with the machine. I also did not like that COS does not allow installing packages. Therefore I tested a second, slightly stronger VM instance.
 
-Finally, the key of the service-account needs to be downloaded and copied to the VM instance:
+**VM2:**
+This one is a n2d-standard-4 instance (single core with 4 vCPUs, with a total of 16 GB Memory) with 30 GB disk size, and [Ubuntu Minimal 22.04 LTS](https://cloud-images.ubuntu.com/minimal/releases/jammy/release/) as the operating system (see: 'vm2' variables in [variables.tf](terraform/variables.tf)). This is a([minimal](https://wiki.ubuntu.com/Minimal)) Linux distro with optimized boot process and reduced package set, but with apt package manager that makes it easy to extend. Using this VM was much more comfortable with the current setup.
+
+
+In both instances, the key of the service-account needs to be downloaded and copied to the VM instance:
 ```
 gcloud compute scp ~/gcp-keys/<filename.json> stocks-scheduler:
 ```
