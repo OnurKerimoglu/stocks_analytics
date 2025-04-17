@@ -44,13 +44,41 @@ module "gcp_cloud_platform" {
   display_name = "Service Account for Compute Engine"
 }
 
-module "gcp_compute_engine" {
+# module "gcp_compute_engine_vm1" {
+#   source       = "./modules/google_compute_engine"
+#   service_name = var.gce_vm1_service_name
+
+#   region       = var.region
+#   zone         = var.zone
+#   machine_type = var.gce_vm1_machine_type
+#   boot_disk_image = var.gce_vm1_boot_disk_image
+#   boot_disk_size = var.gce_vm1_boot_disk_size
+
+#   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
+#   firewall_name                = "airflow-rule"
+#   tags                         = ["http-server", "https-server", "airflow-rule"]
+#   allow = {
+#     1 = {
+#       protocol = "icmp"
+#       ports    = null
+#     },
+#     2 = {
+#       protocol = "tcp"
+#       ports    = ["22", "8080"]
+#     },
+#   }
+# }
+
+
+module "gcp_compute_engine_vm2" {
   source       = "./modules/google_compute_engine"
-  service_name = var.gce_vm1_service_name
+  service_name = var.gce_vm2_service_name
 
   region       = var.region
   zone         = var.zone
-  machine_type = var.gce_vm1_machine_type
+  machine_type = var.gce_vm2_machine_type
+  boot_disk_image = var.gce_vm2_boot_disk_image
+  boot_disk_size = var.gce_vm2_boot_disk_size
 
   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
   firewall_name                = "airflow-rule"

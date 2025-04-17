@@ -18,6 +18,16 @@ variable "machine_type" {
   type        = string
 }
 
+variable "boot_disk_image" {
+  description = "boot_disk_image"
+  type        = string
+}
+
+variable "boot_disk_size" {
+  description = "boot_disk_size"
+  type        = string
+}
+
 variable "metadata" {
   description = "metadata"
   type        = map(any)

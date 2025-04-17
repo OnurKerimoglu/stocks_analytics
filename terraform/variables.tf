@@ -48,12 +48,40 @@ variable "gcs_storage_class" {
 
 variable "gce_vm1_service_name" {
   description = "Compute Engine VM1 Name"
-  #Update the below to a unique bucket name
   default     = "stocks-scheduler"
 }
 
 variable "gce_vm1_machine_type" {
   description = "Compute Engine VM1 Machine Type"
-  #Update the below to a unique bucket name
   default     = "n2d-standard-2"
+}
+
+variable "gce_vm1_boot_disk_image" {
+  description = "Compute Engine VM1 Boot Image (OS)"
+  default     = "cos-cloud/cos-stable-117-18613-164-98"
+}
+
+variable "gce_vm1_boot_disk_size" {
+  description = "Compute Engine VM1 Boot Size"
+  default     = 20
+}
+
+variable "gce_vm2_service_name" {
+  description = "Compute Engine VM2 Name"
+  default     = "stocks-scheduler-2"
+}
+
+variable "gce_vm2_machine_type" {
+  description = "Compute Engine VM2 Machine Type"
+  default     = "n2d-standard-4"
+}
+
+variable "gce_vm2_boot_disk_image" {
+  description = "Compute Engine VM2 Boot Image (OS)"
+  default     = "ubuntu-minimal-2204-jammy-v20250414"
+}
+
+variable "gce_vm2_boot_disk_size" {
+  description = "Compute Engine VM2 Boot Size"
+  default     = 30
 }
