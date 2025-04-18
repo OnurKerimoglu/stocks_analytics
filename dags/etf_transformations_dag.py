@@ -27,13 +27,7 @@ dbt_dir = os.path.join(rootpath, 'dbt', 'stocks_dbt')
         'ETF_symbol': Param(
             'IVV',
             type='string',
-            title='ETF Ticker symbol',
-            description='Current options: QTOP (S&P Top 100), OEF (Nasdaq top 30), IVV (S&P 500)',
-            enum=[
-                'IVV',
-                'QTOP',
-                'OEF'
-            ],
+            title='ETF Ticker symbol'
         )
     }
 )
