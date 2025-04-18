@@ -3,6 +3,7 @@ import logging
 
 from airflow.decorators import dag
 from airflow.operators.bash import BashOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
 
 from src.shared import config_logger
@@ -30,6 +31,13 @@ def ticker_transformations_dag():
         bash_command=f"dbt run -s price_technicals_lastday  --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
     )
 
-    price_technicals
+    triggered_etf_transformations_dag = TriggerDagRunOperator(
+        trigger_dag_id="etf_transformations_dag",
+        task_id="triggered_etf_transformations_dag",
+        wait_for_completion=False,
+        deferrable=False,
+    )
+
+    price_technicals >> triggered_etf_transformations_dag
 
 dag_instance = ticker_transformations_dag()
