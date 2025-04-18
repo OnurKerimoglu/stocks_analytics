@@ -180,9 +180,9 @@ Note that, for some of these tasks, input arguments are provided as lists with `
 ## Data Transformations
 
 ### Ticker Transformations DAG
-The [ticker_transformations_dag](dags/ticker_transformations_dag.py) contains a single dbt task, which is a `BashOperator`:
+The [ticker_transformations_dag](dags/ticker_transformations_dag.py) contains a dbt task wrapped inside a `BashOperator`, and a trigger for the [etf transformations dag](#etf-transformations-dag): 
 
-<img src="documentation/images/airflow_ticker_transformations_dag.png" alt="ticker transformations dag" width="150"/>
+<img src="documentation/images/airflow_ticker_transformations_dag.png" alt="ticker transformations dag" width="320"/>
 
 This `BashOperator` issues a dbt CLI command to run [price_technicals_lastday.sql](dbt/stocks_dbt/models/stocks/price_technicals_lastday.sql), purpose of which is, for each ticker in the stocks_prices table in the [stocks_raw](#stocks_raw) dataset, calculating technical indicators that can be summarized for the last day available (so that one record can be produced per ticker in the target table), and write these results into the, price_technicals_lastday table in the [stocks_refined](#stocks_refined) datasets. Currently, the only indicator calculated is the (Bollinger Band Strategy)[https://en.wikipedia.org/wiki/Bollinger_Bands], according to which,
 
