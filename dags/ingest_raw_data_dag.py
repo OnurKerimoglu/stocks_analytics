@@ -10,10 +10,7 @@ import logging
 
 from airflow.decorators import dag, task, task_group
 from airflow.models.param import Param
-from airflow.utils.task_group import TaskGroup
 from airflow.utils.dates import days_ago
-from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateExternalTableOperator
-import sqlalchemy
 
 from src.shared import config_logger, reformat_json_to_parquet
 from src.download_ticker_data import DownloadTickerData
