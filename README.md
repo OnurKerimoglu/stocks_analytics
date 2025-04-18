@@ -156,7 +156,7 @@ client_email = ****
 ## Data Ingestion
 
 ### Ingestion DAG
-The [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) comprises all ingestion-tasks required for a given ETF (provided as an input argument `ETF_symbol`), so it is somewhat complex: 
+The [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) is the only scheduled dag that runs once a week, specifically on Saturday at 5 AM CET. It comprises all ingestion-tasks required for a given ETF (provided as an input argument `ETF_symbol`), so it is somewhat complex: 
 
 <!---
 ![airflow ingestion dag](documentation/images/airflow_ingestion_dag.png)
@@ -173,14 +173,15 @@ The DAG has 2 main branches: one to process ETF data (branch *A*), another to pr
 - **ul_to_gcs** *(A, B.A, B.B)*: calls the `upload_to_gcs` function from the [gc_functions](src/gc_functions) module to upload a locally stored file into a specified GCS Bucket
 - **create_bq_table** *(A, B.A, B.B)*: calls the `GCScreate_bq_external_table_operator` function from the [gc_functions](src/gc_functions) module (which in turn runs an airflow `BigQueryCreateExternalTableOperator` function) to create an external table in Bigquery based on a specified `.parquet` file in a GCS Bucket 
 - **run_dlt_pl** *(A, B.A, B.B)*: initializes the `LoadTickerData` class from the [load_ticker_data_dlt.py](src/load_ticker_data_dlt.py) module, and runs the appropriate [dlt](#dlt) pipeline (`run_(etf)(price)(info)_pl`) defined in the class 
-- **remove_local (A, B.A, B.B)**: removes local files in a `data/{source}` directory
+- **remove_local** *(A, B.A, B.B)*: removes local files in a `data/{source}` directory
+- **triggered_ticker_transf_dag** *(B.A, B.B)*: this is not a task, but a trigger for the [Ticker Transformations DAG](#ticker-transformations-dag) that runs after the dlt pipelines for both price and info are finalized
 
 Note that, for some of these tasks, input arguments are provided as lists with `.expand()` function (made available to the dag function by airflow's `@task` decorator), so that copies of the task are dynamically created at runtime and mapped to the elements of the list, which is an airflow feature known as [Dynamic Task Mapping](https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/dynamic-task-mapping.html). The number of copied tasks are shown in the DAG diagram in square brackets.
 
 ## Data Transformations
 
 ### Ticker Transformations DAG
-The [ticker_transformations_dag](dags/ticker_transformations_dag.py) contains a dbt task wrapped inside a `BashOperator`, and a trigger for the [etf transformations dag](#etf-transformations-dag): 
+The [ticker_transformations_dag](dags/ticker_transformations_dag.py) takes the input parameter `ETF_symbol`. It contains a dbt task wrapped inside a `BashOperator`, and a trigger for the [etf transformations dag](#etf-transformations-dag): 
 
 <img src="documentation/images/airflow_ticker_transformations_dag.png" alt="ticker transformations dag" width="320"/>
 
@@ -200,7 +201,7 @@ $$
 where BR stands for the Bollinger Recommendation, P is the (closing) Price, $\mu_n(P)$ and $\sigma_n(P)$ are the $n$-day rolling average and standard deviation of Price for the time period, and $K$ is a factor (in the current implementation, $n$=30, $K$=2). As in the current implementation we need the BR only for the last day, the calculation truncates to simple average and standard deviation calculations for the chosen period ($n$=30 days).  
 
 ### ETF Transformations DAG
-The [etf_transformations_dag](dags/etf_transformations_dag.py) takes an input parameter `ETF_symbol` when triggering, and is comprised of 3 `BashOperator` tasks, 2 of which branches from the first task, and can run in parallel:
+The [etf_transformations_dag](dags/etf_transformations_dag.py) takes an input parameter `ETF_symbol`, and is comprised of 3 `BashOperator` tasks, 2 of which branches from the first task, and can run in parallel:
 
 <img src="documentation/images/airflow_etf_transformations_dag.png" alt="etf transformations dag" width="320"/>
 
