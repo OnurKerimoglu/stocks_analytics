@@ -10,6 +10,7 @@ import logging
 
 from airflow.decorators import dag, task, task_group
 from airflow.models.param import Param
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
 
 from src.shared import config_logger, reformat_json_to_parquet
@@ -181,6 +182,13 @@ def ingest_raw_data_dag():
             os.remove(fpath)
             logger.info(f"Removed {fpath}")
         return 'done'
+    
+    triggered_ticker_transformations_dag = TriggerDagRunOperator(
+        trigger_dag_id="ticker_transformations_dag",
+        task_id="triggered_ticker_transf_dag",
+        wait_for_completion=False,
+        deferrable=False,
+    )
 
     ETF_symbol = '{{ params.ETF_symbol }}'
     logger.info(f'Running the ingest_raw_data_dag for {ETF_symbol}')
@@ -224,5 +232,8 @@ def ingest_raw_data_dag():
     symbols >> info_symbol_local >> info_symbol_local_ref
     info_symbol_local_ref >> tg_info() >> remove_local_info
     info_symbol_local_ref >> dlt_pipeline_info >> remove_local_info
+    # trigger ticker_transformations_dag
+    dlt_pipeline_info >> triggered_ticker_transformations_dag 
+    dlt_pipeline_price >> triggered_ticker_transformations_dag
 
 dag_instance = ingest_raw_data_dag()
