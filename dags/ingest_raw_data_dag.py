@@ -65,16 +65,10 @@ def fetch_file_paths(dirpath, ext):
     },
     params={
         'ETF_symbol': Param(
-            'QTOP',
+            'IVV',
             type='string',
             title='ETF Ticker symbol',
-            description='Current options: QTOP (S&P Top 100), OEF (Nasdaq top 30), IVV (S&P 500)',
-            enum=[
-                'QTOP',
-                'OEF',
-                'IVV'
-            ],
-
+            description="E.g., 'IVV' for iShares Core S&P 500",
         )
     }
 )
@@ -188,6 +182,7 @@ def ingest_raw_data_dag():
         task_id="triggered_ticker_transf_dag",
         wait_for_completion=False,
         deferrable=False,
+        conf={'ETF_symbol': "{{ params['ETF_symbol'] }}"}
     )
 
     ETF_symbol = '{{ params.ETF_symbol }}'
