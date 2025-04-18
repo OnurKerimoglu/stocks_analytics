@@ -53,7 +53,7 @@ def fetch_file_paths(dirpath, ext):
     return fpaths
 
 @dag(
-    schedule=None,
+    schedule='0 5 * * 6',
     start_date=days_ago(1), 
     catchup=False,
     description="Ingest raw data for a given ETF ticker",
