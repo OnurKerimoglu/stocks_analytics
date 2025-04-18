@@ -2,6 +2,7 @@ import os
 import logging
 
 from airflow.decorators import dag
+from airflow.models.param import Param
 from airflow.operators.bash import BashOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
@@ -22,6 +23,13 @@ dbt_dir = os.path.join(rootpath, 'dbt', 'stocks_dbt')
         "owner": "Onur",
         "retries": 1,
         "retry_delay": 5
+    },
+    params={
+        'ETF_symbol': Param(
+            'IVV',
+            type='string',
+            title='ETF Ticker symbol'
+        )
     }
 )
 def ticker_transformations_dag():
@@ -36,6 +44,7 @@ def ticker_transformations_dag():
         task_id="triggered_etf_transformations_dag",
         wait_for_completion=False,
         deferrable=False,
+        conf={'ETF_symbol': "{{ params['ETF_symbol'] }}"}
     )
 
     price_technicals >> triggered_etf_transformations_dag
