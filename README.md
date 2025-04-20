@@ -25,7 +25,7 @@ Here is a high-level overview of the solution architecture:
 2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is ran through a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed
 3. [Metabase Dashboards](#metabase-dashboard) (orange box) served to public
 
-In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally the [Metabase dashboard](#metabase-dashboard) are provided. 
+In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally the [Metabase dashboard](#metabase-dashboard) are provided. 
 
 # Data Sources
 
