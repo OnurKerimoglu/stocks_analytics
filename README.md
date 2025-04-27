@@ -210,8 +210,8 @@ These `BashOperator` tasks run dbt models that have names identical to the calli
 - [etf_sector_aggregates](dbt/stocks_dbt/models/stocks/etf_sector_aggregates.sql): this model builds on the etf_tickers_combine model, basically by applyting various aggregation functions to the fields of this table over sectors.
 - [etf_top_ticker_prices](dbt/stocks_dbt/models/stocks/etf_top_ticker_prices.sql): this model mainly choses the most important (by weight) tickers for the specified ETF (i.e., input parameter) from the stock_prices table (in [stocks_raw](#stocks_raw) dataset) by joining with the etf_tickers_combine table created by the first task.
 
-## Metabase Dashboard
-For developing the dashboards, I used [Metabase Open Source](https://www.metabase.com/start/oss/), and for publishing I migrated to [Metabase Cloud](https://www.metabase.com/cloud/). As an example, for ETF: [IVV](https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf), here is the [dashboard](https://stocks-analytics.metabaseapp.com/public/dashboard/c002f7a9-9418-4acb-a9b6-54b9171a2c9c). It should look something like this:
+## ~~Metabase~~ Streamlit Dashboard
+For developing the dashboards, I used ~~Metabase Open Source, and for publishing I migrated to Metabase Cloud~~ (**Update:** as my trial period ended, I decided to create a [dashboard with Streamlit](https://stocks-analytics-dashboard.streamlit.app/)). It should look something like this (screenshot is from the Metabae dashboard, but the Streamlit panels are the same):
 
 <img src="documentation/images/Dashboard_Metabase.png" alt="etf transformations dag" width="800"/>
 
