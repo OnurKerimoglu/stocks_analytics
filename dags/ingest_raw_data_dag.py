@@ -65,10 +65,10 @@ def fetch_file_paths(dirpath, ext):
     },
     params={
         'ETF_symbol': Param(
-            'IVV',
+            'QTOP',
             type='string',
             title='ETF Ticker symbol',
-            description="E.g., 'IVV' for iShares Core S&P 500",
+            description="E.g., 'QTOP' for iShares Nasdaq top 30",
         )
     }
 )
