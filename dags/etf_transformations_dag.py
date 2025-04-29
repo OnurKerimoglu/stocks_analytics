@@ -25,7 +25,7 @@ dbt_dir = os.path.join(rootpath, 'dbt', 'stocks_dbt')
     },
     params={
         'ETF_symbol': Param(
-            'IVV',
+            'QTOP',
             type='string',
             title='ETF Ticker symbol'
         )
