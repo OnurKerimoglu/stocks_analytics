@@ -59,6 +59,6 @@ class DownloadETFData():
 
 
 if __name__ == "__main__":
-    ded = DownloadETFData('IVV')
+    ded = DownloadETFData('OEF')  # eg IVV, QTOP, OEF
     ded.download_etf_tickers()
     
