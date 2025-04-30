@@ -85,8 +85,8 @@ All the raw data are stored as .parquet files in a GCS bucket, split into three 
 
 Contents of these folders are probably self-evident (see the previous section for the contents of files and how they are generated):
 - etf: .parquet files for each of the ETFs being tracked. See the [ETF Compositions](#etf-compositions) 
-- info: .parquet files for each company ticker held by any ETF (no duplicates for holdings contained by multiple ETFs). See the [Stock Information](#stock-information) section above for the contents.
-- prices: same as for the info files, but containing the daily price history of the company. See the [Stock Prices](#stock-prices) section above for the contents.
+- info: .parquet files for each company ticker held by any ETF (no duplicates for holdings contained by multiple ETFs). See the [Stock Information and Prices](#stock-information-and-prices) section above for the contents.
+- prices: same as for the info files, but containing the daily price history of the company. See the [Stock Information and Prices](#stock-information-and-prices)  section above for the contents. This table is clustered by `symbol` column for improved query performance.
 
 
 
@@ -105,7 +105,7 @@ contains an external table for each .parquet file in the [data lake](#data-lake)
 This dataset has two variants for development (suffix: _staging) and production environments (no suffix), where the tables are created by the [dlt (data load tool)](#dlt), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
 - etfs: concateneted [ETF Compositions](#etf-compositions) for all ETFs being tracked, as identified by `fund_ticker` column
 - stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
-- stock_price: concatenated [Stock Prices](#stock-prices) for all company tickers being tracked, as identified by `symbol` column
+- stock_price: concatenated [Stock Prices](#stock-prices) for all company tickers being tracked, as identified by `symbol` column. 
 
 This design follows the [star schema](https://en.wikipedia.org/wiki/Star_schema), where the stock_price is a rapidly changing fact table, and the etfs and stock_info are the slower-changing dimensions tables.
 
@@ -143,11 +143,16 @@ Data transformations are done with [dbt (data build tool) -core](https://docs.ge
 [destination.bigquery]
 location = ****
 
+[destination.filesystem]
+bucket_url = "gs://****"
+
 [destination.bigquery.credentials]
 project_id = ****
 private_key = ****
 client_email = ****
-``` 
+```
+Note that, here the bucket_url is required for being able to make use of the [staging functionality of dlt](https://dlthub.com/docs/dlt-ecosystem/staging).
+
 3. no additional configuration step is needed for dbt. For info, the dbt models are made available to Airflow while building the container with [docker-compose.yaml](Docker/airflow/docker-compose.yaml) by mounting the `dbt` folder  to `/opt/airflow/dbt`, which contains the dbt repository [stocks_dbt](https://github.com/OnurKerimoglu/stocks_dbt.git) as a submodule, which in turn contains the (profiles.yml) file inside a [config](dbt/stocks/dbt/config) folder (which by default is located under the dbt folder, e.g., $HOME/.dbt on Unix systems.). This non-default location for the profiles.yml file requires its specification while making a call to the dbt client (e.g., as in `bash_command=f"dbt run -s <model-name>  --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"`, where, `dbt_dir` points to `/opt/airflow/dbt/stocks_dbt`). 
 
 4. (If Airflow is hosted on a remote machine): the webserver port needs to be forwarded to a `local-port`, from which Airflow UI can be displayed. On a terminal `ssh -L <local-port>:localhost:8081 <user>@stocks-scheduler -N` (note that [Docker-compose.yml](Docker/airflow/docker-compose.yaml) specifies the non-default 8081 as the webserver port).
