@@ -39,6 +39,8 @@ class DownloadETFData():
             raise ValueError(f"ETF {self.fund_ticker} not found")
         holdings_df = self.etf_scraper.query_holdings(self.fund_ticker, None)
         ticker_name = self.etfs_df.fund_name.loc[self.etfs_df.ticker == self.fund_ticker].values[0]
+        # Preserve only non-equity holdings
+        holdings_df = holdings_df[holdings_df['asset_class'] == 'Equity']
         self.logger.info(
             f'Fetched {holdings_df.shape[0]} holding tickers for ETF ticker: {self.fund_ticker} ({ticker_name})')
         self.save_etf_df(holdings_df)
