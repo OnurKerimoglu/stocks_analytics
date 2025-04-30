@@ -16,8 +16,9 @@ class DownloadTickerData():
               ticker,
               period='5d', # valid periods: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
               test=False,
+              ignore_existent=False,  # if ignore_existent=True, the locally available data will be overwritten
               out_format='parquet',  # csv, parquet
-              log_level='info' # valid levels: debug, info
+              log_level='info', # valid levels: debug, info
               ):
         config_logger(log_level)
         self.logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ class DownloadTickerData():
             else:
                 self.ticker = [ticker]
         self.test = test
+        self.ignore_existent = ignore_existent
         if self.test:
             self.period = '5d'
         else:
@@ -67,17 +69,29 @@ class DownloadTickerData():
         tickers = ["AAPL", "GOOGL", "MSFT", "AMZN"]
         return tickers
 
-    def download_infos(self):
+    def download_wrapper(self, func):
         for ticker in self.ticker:
-            self.download_info_single(ticker)
+            suffix = '_test' if self.test else ''
+            fpath = os.path.join(self.datapath_info, '{}{}.json'.format(ticker, suffix))
+            flag = True
+            if not self.ignore_existent:
+                if os.path.exists(fpath):
+                    self.logger.info(
+                        'Locally available data for {} will be kept'.format(ticker))
+                    flag = False
+            if flag:
+                if os.path.exists(fpath):
+                    self.logger.info(
+                        'Locally available data for {} will be overwritten'.format(ticker))
+                func(ticker)
+
+    def download_infos(self):
+        self.download_wrapper(self.download_info_single)
 
     def download_prices(self):
-        for ticker in self.ticker:
-            self.download_price_single(ticker)
+        self.download_wrapper(self.download_price_single)
     
-    def download_info_single(self, ticker):
-        self.logger.info(
-            'Downloading info for {}'.format(ticker))
+    def download_info_single(self, ticker, fpath):
         try:
             stock = yf.Ticker(ticker)
             info = stock.info  # Fetch all available info
@@ -89,8 +103,6 @@ class DownloadTickerData():
         else:
             self.logger.info(f"Fetched stock info for {ticker}")
             fundamentals = self.get_stock_fundamentals(ticker, info)
-        suffix = '_test' if self.test else ''
-        fpath = os.path.join(self.datapath_info, '{}{}.json'.format(ticker, suffix))
         with open(fpath, 'w') as fp:
             json.dump(fundamentals, fp)
         self.logger.info(
@@ -223,12 +235,13 @@ class DownloadTickerData():
 
 if __name__ == '__main__':
     dtd = DownloadTickerData(
-        ticker='ETF_holdings_IVV.csv',
+        ticker='ETF_holdings_QTOP.csv',
         # ticker='default_list',
         # ticker=['MSFT', 'AAPL'],
         # ticker='MSFT',
         period='max',
-        test=False,
+        test=False,  # if test=True, only the data from last 5d for price will be downloaded
+        ignore_existent=False,  # if ignore_existent=True, the locally available data will be overwritten
         out_format='parquet')
-    # dtd.download_prices()
+    dtd.download_prices()
     dtd.download_infos()
