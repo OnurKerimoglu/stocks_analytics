@@ -2,6 +2,7 @@ import logging
 import os
 
 import dlt
+from dlt.destinations.adapters import bigquery_adapter
 import json
 import pandas as pd
 
@@ -169,11 +170,20 @@ class LoadTickerData():
         else:
             write_disp = 'append'
             load_type = 'incremental'
+        if self.dest == 'duckdb':
+            data = self.stock_prices_raw(paths, load_type)
+        elif self.dest == 'bigquery':
+            data = bigquery_adapter(
+                    self.stock_prices_raw(paths, load_type),
+                    cluster = "symbol",
+                    autodetect_schema=True
+                    )
         info = pipeline.run(
-            self.stock_prices_raw(paths, load_type),
+            data,
             table_name='stock_prices',
-            loader_file_format="jsonl",
-            write_disposition=write_disp)
+            loader_file_format="parquet",
+            write_disposition=write_disp,
+            )
         # self.logger.info(info)
         self.logger.info(pipeline.last_trace)
 
@@ -184,6 +194,7 @@ class LoadTickerData():
         info = pipeline.run(
             self.stock_info_raw(paths),
             table_name='stock_info',
+            loader_file_format="jsonl",
             write_disposition=write_disp)
         # self.logger.info(info)
         self.logger.info(pipeline.last_trace)
@@ -195,12 +206,12 @@ if __name__ == '__main__':
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_key_fpath
     # initialize:
     load_ticker = LoadTickerData(
-        full_load=False,
+        full_load=True,
         # dest='duckdb',
         dest='bigquery',
         dev_mode=True,
         log_level='info')
     # load_ticker.run_etf_pipeline()
-    # load_ticker.run_price_pipeline()
-    load_ticker.run_info_pipeline()
+    load_ticker.run_price_pipeline()
+    # load_ticker.run_info_pipeline()
     
