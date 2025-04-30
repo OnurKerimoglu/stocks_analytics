@@ -52,6 +52,7 @@ class LoadTickerData():
         self.etf_pipeline_bq = dlt.pipeline(
             pipeline_name="load_etfs_raw_bq",
             destination="bigquery",
+            staging='filesystem',
             dataset_name=f'{dataset_name}{dataset_suf}'
             # dev_mode=self.dev_mode
         )
@@ -65,6 +66,7 @@ class LoadTickerData():
         self.price_pipeline_bq = dlt.pipeline(
             pipeline_name="load_stock_prices_raw_bq",
             destination="bigquery",
+            staging='filesystem',
             dataset_name=f'{dataset_name}{dataset_suf}'
             # dev_mode=self.dev_mode
         )
@@ -78,6 +80,7 @@ class LoadTickerData():
         self.info_pipeline_bq = dlt.pipeline(
             pipeline_name="load_stock_info_raw_bq",
             destination="bigquery",
+            staging='filesystem',
             dataset_name=f'{dataset_name}{dataset_suf}'
             # dev_mode=self.dev_mode
         )
