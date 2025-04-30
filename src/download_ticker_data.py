@@ -46,6 +46,11 @@ class DownloadTickerData():
             self.ticker = FetchSymbols(
                 file=os.path.join(self.datapath, ticker)
                 ).symbols
+            # if the filename starts with 'ETF_holdings_', 
+            # we want to download the data of the ETF symbol iteself too
+            if ticker.startswith('ETF_holdings_'):
+                ETF_symbol = ticker.split('ETF_holdings_')[1].split('.csv')[0]
+                self.ticker.append(ETF_symbol)
         else:
             if type(ticker) == list:
                 self.ticker = ticker

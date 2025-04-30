@@ -53,6 +53,8 @@ class DownloadETFData():
 
     def save_get_etf_holdings(self, holdings_df):
         # write the ticker list to a local csv file
+        # Note: it is critical that the filename starts with 'ETF_holdings_' as this will indicate .. 
+        # in another step (download_ticker_data.py) that the data of the ETF symbol itself is needed too
         fpath = os.path.join(self.datapath, f'ETF_holdings_{self.fund_ticker}.csv')
         holdings_df_reduced = holdings_df['ticker']
         holdings_df_reduced.rename('symbol', inplace=True)
