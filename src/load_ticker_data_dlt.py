@@ -18,7 +18,8 @@ class LoadTickerData():
         # configure and start logger
         config_logger(log_level)
         self.logger = logging.getLogger(__name__)
-        dataset_suf = '_dev' if dev_mode else ''
+        self.dataset_name = dataset_name
+        self.dataset_suf = '_dev' if dev_mode else ''
         loadtype = 'full' if full_load else 'incremental'
         
         mode = 'dev' if dev_mode==True else 'prod'
@@ -27,6 +28,8 @@ class LoadTickerData():
         
         # input arguments
         self.full_load = full_load
+        if dest not in ['duckdb', 'bigquery']:
+            raise ValueError(f"Unknown dest: {dest}. Accepted: 'duckdb', 'bigquery'")
         self.dest = dest
         self.dev_mode = dev_mode
             
@@ -37,54 +40,60 @@ class LoadTickerData():
         self.datapath_etf= os.path.join(self.rootpath, 'data', 'etf')
         self.datapath_price = os.path.join(self.rootpath, 'data', 'price')
         self.datapath_info = os.path.join(self.rootpath, 'data', 'info')
-        self.paths_etfs = self.fetch_data_paths(self.datapath_etf, 'parquet')
-        self.paths_price = self.fetch_data_paths(self.datapath_price, 'parquet')
-        self.paths_info = self.fetch_data_paths(self.datapath_info, 'parquet')
 
-        # Define dlt pipelines
-        # ETF
-        self.etf_pipeline_duckdb = dlt.pipeline(
-            pipeline_name='load_etfs_raw_duckb',
-            destination='duckdb',
-            dataset_name=f'{dataset_name}{dataset_suf}'
-            # dev_mode=self.dev_mode
-        )
-        self.etf_pipeline_bq = dlt.pipeline(
-            pipeline_name="load_etfs_raw_bq",
-            destination="bigquery",
-            staging='filesystem',
-            dataset_name=f'{dataset_name}{dataset_suf}'
-            # dev_mode=self.dev_mode
-        )
-        # Price
-        self.price_pipeline_duckdb = dlt.pipeline(
-            pipeline_name='load_stock_prices_raw_duckb',
-            destination='duckdb',
-            dataset_name=f'{dataset_name}{dataset_suf}'
-            # dev_mode=self.dev_mode
-        )
-        self.price_pipeline_bq = dlt.pipeline(
-            pipeline_name="load_stock_prices_raw_bq",
-            destination="bigquery",
-            staging='filesystem',
-            dataset_name=f'{dataset_name}{dataset_suf}'
-            # dev_mode=self.dev_mode
-        )
-        # Info
-        self.info_pipeline_duckdb = dlt.pipeline(
-            pipeline_name='load_stock_info_raw_duckb',
-            destination='duckdb',
-            dataset_name=f'{dataset_name}{dataset_suf}'
-            # dev_mode=self.dev_mode
-        )
-        self.info_pipeline_bq = dlt.pipeline(
-            pipeline_name="load_stock_info_raw_bq",
-            destination="bigquery",
-            staging='filesystem',
-            dataset_name=f'{dataset_name}{dataset_suf}'
-            # dev_mode=self.dev_mode
-        )
-    
+    def define_pipeline(self, source_type):
+        if source_type == 'etf':
+            if self.dest == 'duckdb':
+                pipeline = dlt.pipeline(
+                    pipeline_name='load_etfs_raw_duckb',
+                    destination='duckdb',
+                    dataset_name=f'{self.dataset_name}{self.dataset_suf}'
+                    # dev_mode=self.dev_mode
+                )
+            elif self.dest == 'bigquery':
+                pipeline = dlt.pipeline(
+                    pipeline_name="load_etfs_raw_bq",
+                    destination="bigquery",
+                    staging='filesystem',
+                    dataset_name=f'{self.dataset_name}{self.dataset_suf}'
+                    # dev_mode=self.dev_mode
+                )
+        elif source_type == 'info':
+            if self.dest == 'duckdb':
+                pipeline = dlt.pipeline(
+                pipeline_name='load_stock_info_raw_duckb',
+                destination='duckdb',
+                dataset_name=f'{self.dataset_name}{self.dataset_suf}'
+                # dev_mode=self.dev_mode
+                )
+            elif self.dest == 'bigquery':
+                pipeline = dlt.pipeline(
+                pipeline_name="load_stock_info_raw_bq",
+                destination="bigquery",
+                staging='filesystem',
+                dataset_name=f'{self.dataset_name}{self.dataset_suf}'
+                # dev_mode=self.dev_mode
+                )
+        elif source_type == 'price':
+            if self.dest == 'duckdb':
+                pipeline = dlt.pipeline(
+                pipeline_name='load_stock_prices_raw_duckb',
+                destination='duckdb',
+                dataset_name=f'{self.dataset_name}{self.dataset_suf}'
+                # dev_mode=self.dev_mode
+                )  
+            elif self.dest == 'bigquery':
+                pipeline = dlt.pipeline(
+                pipeline_name="load_stock_prices_raw_bq",
+                destination="bigquery",
+                staging='filesystem',
+                dataset_name=f'{self.dataset_name}{self.dataset_suf}'
+                # dev_mode=self.dev_mode
+                )
+        else:
+            raise ValueError(f"Unknown source_type: {source_type}. Accepted: 'etf','info','price'")
+        return pipeline
+            
     def fetch_data_paths(self, datapath, ext):
         # construct a list of absolute paths based on the 
         # (non-test) files with the specified extension in the self.datapth folder
@@ -141,27 +150,19 @@ class LoadTickerData():
             yield d
 
     def run_etf_pipeline(self):
-        if self.dest == 'duckdb':
-            pipeline = self.etf_pipeline_duckdb
-        elif self.dest == 'bigquery':
-            pipeline = self.etf_pipeline_bq
-        else:
-            raise ValueError(f"Unknown dest: {self.dest}. Accepted: 'duckdb', 'bigquery'")
+        pipeline = self.define_pipeline(source_type='etf')
+        paths = self.fetch_data_paths(self.datapath_etf, 'parquet')
         write_disp = 'replace'
         info = pipeline.run(
-            self.etfs_raw(self.paths_etfs),
+            self.etfs_raw(paths),
             table_name='etfs',
             write_disposition=write_disp)
         # self.logger.info(info)
         self.logger.info(pipeline.last_trace)
 
     def run_price_pipeline(self):
-        if self.dest == 'duckdb':
-            pipeline = self.price_pipeline_duckdb
-        elif self.dest == 'bigquery':
-            pipeline = self.price_pipeline_bq
-        else:
-            raise ValueError(f"Unknown dest: {self.dest}. Accepted: 'duckdb', 'bigquery'")
+        pipeline = self.define_pipeline(source_type='price')
+        paths = self.fetch_data_paths(self.datapath_price, 'parquet')
         if self.full_load:
             write_disp = 'replace'
             load_type = 'full'
@@ -169,7 +170,7 @@ class LoadTickerData():
             write_disp = 'append'
             load_type = 'incremental'
         info = pipeline.run(
-            self.stock_prices_raw(self.paths_price, load_type),
+            self.stock_prices_raw(paths, load_type),
             table_name='stock_prices',
             loader_file_format="jsonl",
             write_disposition=write_disp)
@@ -177,15 +178,11 @@ class LoadTickerData():
         self.logger.info(pipeline.last_trace)
 
     def run_info_pipeline(self):
-        if self.dest == 'duckdb':
-            pipeline = self.info_pipeline_duckdb
-        elif self.dest == 'bigquery':
-            pipeline = self.info_pipeline_bq
-        else:
-            raise ValueError(f"Unknown dest: {self.dest}. Accepted: 'duckdb', 'bigquery'")
+        pipeline = self.define_pipeline(source_type='info')
+        paths = self.fetch_data_paths(self.datapath_info, 'json') 
         write_disp = 'replace'
         info = pipeline.run(
-            self.stock_info_raw(self.paths_info),
+            self.stock_info_raw(paths),
             table_name='stock_info',
             write_disposition=write_disp)
         # self.logger.info(info)
@@ -203,7 +200,7 @@ if __name__ == '__main__':
         dest='bigquery',
         dev_mode=True,
         log_level='info')
-    load_ticker.run_etf_pipeline()
+    # load_ticker.run_etf_pipeline()
     # load_ticker.run_price_pipeline()
-    # load_ticker.run_info_pipeline()
+    load_ticker.run_info_pipeline()
     
