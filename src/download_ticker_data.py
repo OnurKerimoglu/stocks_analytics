@@ -98,7 +98,7 @@ class DownloadTickerData():
         except Exception as e:
             self.logger.error(f"Error fetching stock info for {ticker}: {str(e)}")
             info = {}
-        if len(info) == 1:
+        if len(info) <= 1:
             fundamentals = {}
         else:
             self.logger.info(f"Fetched stock info for {ticker}")
