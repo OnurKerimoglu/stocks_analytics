@@ -11,7 +11,7 @@ from src.shared import config_logger
 class LoadTickerData():
     def __init__(
             self,
-            full_load=False,
+            full_load=True,
             dest='duckdb',
             dataset_name='stocks_raw',
             dev_mode=False,
