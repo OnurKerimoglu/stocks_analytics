@@ -1,10 +1,12 @@
 """
 DAG for:
-1. Downloading ETF data for a given ETF ticker (input parameter), and price and info data for each ETF holding
-2. Uploading etf, price and info (fundamental) data to GCS and creating external tables in BQ
-3. Running the dlt pipeline to load and merge etf, price and info data into BQ
-4. Removing local data
+1. Downloading ETF data for a given list of ETF tickers (input parameter)
+2. Downloading price and info data for each ticker held by ETFs
+3. Uploading etf, price and info (fundamental) data to GCS and creating external tables in BQ
+4. Running the dlt pipeline to load and merge etf, price and info data into BQ
+5. Removing local data
 """
+import ast
 import os
 import logging
 
@@ -52,6 +54,11 @@ def fetch_file_paths(dirpath, ext):
             fpaths.append(os.path.join(dirpath, f))
     return fpaths
 
+def fetch_symbols_for_etf(filename):
+    fpath = os.path.join(rootpath, 'data', filename)
+    symbols = FetchSymbols(file = fpath).symbols
+    return symbols
+    
 @dag(
     schedule='0 1 * * *',
     start_date=days_ago(1), 
@@ -64,27 +71,40 @@ def fetch_file_paths(dirpath, ext):
         "retry_delay": 5
     },
     params={
-        'ETF_symbol': Param(
-            'QTOP',
-            type='string',
-            title='ETF Ticker symbol',
-            description="E.g., 'QTOP' for iShares Nasdaq top 30",
+        'ETF_symbols': Param(
+            ["QTOP", "OEF"],
+            type="array",
+            title='List of ETF Ticker symbols',
+            examples=["QTOP", "OEF"]
+            # description="E.g., ["QTOP"] for iShares Nasdaq top 30",
         )
     }
 )
 def ingest_raw_data_dag():
-    
     @task
-    def get_etf_data(etf_ticker):
-        DownloadETFData(
-            etf_ticker
-            ).download_etf_tickers()
-        return etf_ticker
+    def get_etf_symbols_from_params(**context):
+        etf_symbols = context["params"]["ETF_symbols"]
+        return etf_symbols  
 
     @task
-    def fetch_symbols(filename):
-        fpath = os.path.join(rootpath, 'data', filename)
-        symbols = FetchSymbols(file = fpath).symbols
+    def get_etf_data(ETF_symbol: str):
+        DownloadETFData(
+            [ETF_symbol]
+            ).download_etf_tickers()
+        return ETF_symbol
+
+    @task
+    def fetch_unique_symbols_for_etfs(ETF_symbols: list):
+        # collect all symbols for each ETF
+        logger.info(f'Getting ticker symbols for {len(ETF_symbols)} ETFs:')
+        symbols_all = []
+        for ETF_symbol in ETF_symbols:
+            logger.info(f'Getting for {ETF_symbol}')
+            symbols_etf = fetch_symbols_for_utf(f'ETF_holdings_{str(ETF_symbol)}.csv')
+            symbols_all =  symbols_all + symbols_etf
+        # eliminate duplicates
+        symbols = list(set(symbols_all))
+        logger.info(f'Returnig {len(symbols)} unique symbols')
         return symbols
 
     @task
@@ -114,7 +134,7 @@ def ingest_raw_data_dag():
         
     @task
     def ul_to_gcs(source: str, ticker: str):
-        logger.info(f"Storing {ticker} price in GCS")
+        logger.info(f"Storing {ticker} data in GCS")
         fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
         object_name=f"{source}/{os.path.basename(fpath)}"
         if os.path.exists(fpath):
@@ -184,19 +204,25 @@ def ingest_raw_data_dag():
         deferrable=False,
         conf={'ETF_symbol': "{{ params['ETF_symbol'] }}"}
     )
-
-    ETF_symbol = '{{ params.ETF_symbol }}'
-    logger.info(f'Running the ingest_raw_data_dag for {ETF_symbol}')
+    
+    # ETF_symbols = '{{ params.ETF_symbols }}'
+    # Parse the ETF_symbols to be processed from the input params
+    ETF_symbols = get_etf_symbols_from_params()
+    logger.info(f'Running the ingest_raw_data_dag for {ETF_symbols}')
+    
     # Control Flow
     # ETF tasks
-    etf_ticker = get_etf_data(ETF_symbol)
+    ETF_symbol_local = get_etf_data.expand(ETF_symbol=ETF_symbols)
+
+    symbols = fetch_symbols_for_all_etfs(ETF_symbols)
+
     @task_group(group_id="tg_etf")
     def tg_etf():
-        etf_gcs = ul_to_gcs(source='etf', ticker=etf_ticker)
-        etf_bqext = create_bq_table(source='etf', ticker=etf_gcs)
+        ETF_symbol_gcs = ul_to_gcs.partial(source='etf').expand(ticker=ETF_symbol_local)
+        etf_bqext = create_bq_table.partial(source='etf').expand(ticker=ETF_symbol_gcs)
     dlt_pipeline_etf = run_dlt_pl(source='etf', full_load=True)
     remove_local_etf = remove_local(source='etf')
-    symbols = fetch_symbols(f'ETF_holdings_{str(ETF_symbol)}.csv')
+    
     # Price tasks
     price_symbol_local = get_ticker_price.expand(ticker=symbols)
     @task_group(group_id="tg_price")
@@ -216,17 +242,20 @@ def ingest_raw_data_dag():
     remove_local_info = remove_local(source='info')
 
     # etf tasks
-    etf_ticker >> tg_etf() >> remove_local_etf
-    etf_ticker >> dlt_pipeline_etf >> remove_local_etf
-    etf_ticker >> symbols
+    ETF_symbol_local >> symbols >> remove_local_etf
+    ETF_symbol_local >> tg_etf() >> remove_local_etf
+    ETF_symbol_local  >> dlt_pipeline_etf >> remove_local_etf
+
     # price tasks
     symbols >> price_symbol_local
     price_symbol_local >> tg_price() >> remove_local_price
     price_symbol_local >> dlt_pipeline_price >> remove_local_price
+
     # info tasks
     symbols >> info_symbol_local >> info_symbol_local_ref
     info_symbol_local_ref >> tg_info() >> remove_local_info
     info_symbol_local_ref >> dlt_pipeline_info >> remove_local_info
+
     # trigger ticker_transformations_dag
     dlt_pipeline_info >> triggered_ticker_transformations_dag 
     dlt_pipeline_price >> triggered_ticker_transformations_dag
