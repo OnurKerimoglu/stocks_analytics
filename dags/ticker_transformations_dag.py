@@ -23,13 +23,6 @@ dbt_dir = os.path.join(rootpath, 'dbt', 'stocks_dbt')
         "owner": "Onur",
         "retries": 1,
         "retry_delay": 5
-    },
-    params={
-        'ETF_symbol': Param(
-            'IVV',
-            type='string',
-            title='ETF Ticker symbol'
-        )
     }
 )
 def ticker_transformations_dag():

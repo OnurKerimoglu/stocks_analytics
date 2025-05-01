@@ -205,8 +205,7 @@ def ingest_raw_data_dag():
         trigger_dag_id="ticker_transformations_dag",
         task_id="triggered_ticker_transf_dag",
         wait_for_completion=False,
-        deferrable=False,
-        conf={'ETF_symbol': "{{ params['ETF_symbol'] }}"}
+        deferrable=False
     )
     
     # ETF_symbols = '{{ params.ETF_symbols }}'
