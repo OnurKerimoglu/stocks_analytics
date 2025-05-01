@@ -1,7 +1,7 @@
 import logging
 
 from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateExternalTableOperator
-from google.cloud import storage
+from google.cloud import storage, bigquery
 
 from src.shared import config_logger
 
@@ -77,4 +77,12 @@ def create_bq_external_table_operator(
         )
     return BQoperator
 
-    
+def get_data_from_bq_operator(
+        PROJECT_ID: str,
+        QUERY: str
+    ):
+    client = bigquery.Client(project=PROJECT_ID)
+
+    query_job = client.query(QUERY)  # API request
+    data = query_job.result()  # Waits for query to finish
+    return data.to_dataframe() # Return as a pandas DataFrame
