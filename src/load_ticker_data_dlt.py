@@ -189,7 +189,7 @@ class LoadTickerData():
 
     def run_info_pipeline(self):
         pipeline = self.define_pipeline(source_type='info')
-        paths = self.fetch_data_paths(self.datapath_info, 'json') 
+        paths = self.fetch_data_paths(self.datapath_info, 'parquet') 
         write_disp = 'replace'
         info = pipeline.run(
             self.stock_info_raw(paths),
