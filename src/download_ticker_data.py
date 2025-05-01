@@ -52,6 +52,8 @@ class DownloadTickerData():
             if ticker.startswith('ETF_holdings_'):
                 ETF_symbol = ticker.split('ETF_holdings_')[1].split('.csv')[0]
                 self.ticker.append(ETF_symbol)
+                self.logger.info(
+                        'added {ETF_symbol} to the list of tickers')
         else:
             if type(ticker) == list:
                 self.ticker = ticker
