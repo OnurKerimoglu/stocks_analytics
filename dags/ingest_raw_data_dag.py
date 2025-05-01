@@ -101,7 +101,11 @@ def ingest_raw_data_dag():
         for ETF_symbol in ETF_symbols:
             logger.info(f'Getting for {ETF_symbol}')
             symbols_etf = fetch_symbols_for_etf(f'ETF_holdings_{str(ETF_symbol)}.csv')
-            symbols_all =  symbols_all + symbols_etf
+            # add the ETF_symbol itself to the list
+            logger.info(f'Adding {ETF_symbol} to the list of symbols')
+            symbols_etf += [ETF_symbol]
+            symbols_all +=  symbols_etf
+            logger.info(f'Number of all symbols: {len(symbols_all)}')
         # eliminate duplicates
         symbols = list(set(symbols_all))
         logger.info(f'Returnig {len(symbols)} unique symbols')
