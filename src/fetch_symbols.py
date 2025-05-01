@@ -42,7 +42,7 @@ class FetchSymbols():
             symbols = list(df.symbol.values)
         else:
             symbols = list(df.iloc[:,0])
-        self.logger.info('Fetched symbols from file')
+        self.logger.info(f'Fetched {len(symbols)} symbols from file')
         return symbols
 
     def _fetch_default_symbols(self):
