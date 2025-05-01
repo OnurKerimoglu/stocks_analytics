@@ -36,8 +36,7 @@ def ticker_transformations_dag():
         trigger_dag_id="etf_transformations_dag",
         task_id="triggered_etf_transformations_dag",
         wait_for_completion=False,
-        deferrable=False,
-        conf={'ETF_symbol': "{{ params['ETF_symbol'] }}"}
+        deferrable=False
     )
 
     price_technicals >> triggered_etf_transformations_dag
