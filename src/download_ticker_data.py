@@ -53,7 +53,7 @@ class DownloadTickerData():
                 ETF_symbol = ticker.split('ETF_holdings_')[1].split('.csv')[0]
                 self.ticker.append(ETF_symbol)
                 self.logger.info(
-                        'added {ETF_symbol} to the list of tickers')
+                        f'added {ETF_symbol} to the list of tickers')
         else:
             if type(ticker) == list:
                 self.ticker = ticker
@@ -111,8 +111,13 @@ class DownloadTickerData():
             self.logger.info(f"Fetched stock info for {ticker}")
             fundamentals = self.get_stock_fundamentals(ticker, info)
         # store
-        with open(fpath, 'w') as fp:
-            json.dump(fundamentals, fp)
+        if fpath.endswith('.json'):
+            with open(fpath, 'w') as fp:
+                json.dump(fundamentals, fp)
+        elif fpath.endswith('parquet'):
+            df = pd.DataFrame(fundamentals, index=[0])
+            df.to_parquet(fpath)
+
         self.logger.info(
             'Data downloaded to {}'.format(fpath))
 
@@ -228,10 +233,10 @@ class DownloadTickerData():
             # The first level is the actual column names
             df.columns = [col[0] for col in df.columns.values]
             # store
-            if self.out_format == 'csv':
+            if fpath.endswith('.csv'):
                 with open(fpath, 'w') as f:
                     df.to_csv(f)
-            elif self.out_format == 'parquet':
+            elif fpath.endswith('parquet'):
                 df.to_parquet(fpath)
             else:
                 raise Exception ('out_format must be "csv" or "parquet"')
@@ -241,7 +246,7 @@ class DownloadTickerData():
 
 if __name__ == '__main__':
     dtd = DownloadTickerData(
-        ticker='ETF_holdings_QTOP.csv',
+        ticker='ETF_holdings_OEF.csv',
         # ticker='default_list',
         # ticker=['MSFT', 'AAPL'],
         # ticker='MSFT',
@@ -249,5 +254,5 @@ if __name__ == '__main__':
         test=False,  # if test=True, only the data from last 5d for price will be downloaded
         ignore_existent=False,  # if ignore_existent=True, the locally available data will be overwritten
         out_format='parquet')
-    dtd.download_prices()
+    # dtd.download_prices()
     dtd.download_infos()
