@@ -100,7 +100,7 @@ def ingest_raw_data_dag():
         symbols_all = []
         for ETF_symbol in ETF_symbols:
             logger.info(f'Getting for {ETF_symbol}')
-            symbols_etf = fetch_symbols_for_utf(f'ETF_holdings_{str(ETF_symbol)}.csv')
+            symbols_etf = fetch_symbols_for_etf(f'ETF_holdings_{str(ETF_symbol)}.csv')
             symbols_all =  symbols_all + symbols_etf
         # eliminate duplicates
         symbols = list(set(symbols_all))
@@ -214,7 +214,7 @@ def ingest_raw_data_dag():
     # ETF tasks
     ETF_symbol_local = get_etf_data.expand(ETF_symbol=ETF_symbols)
 
-    symbols = fetch_symbols_for_all_etfs(ETF_symbols)
+    symbols = fetch_unique_symbols_for_etfs(ETF_symbols)
 
     @task_group(group_id="tg_etf")
     def tg_etf():
