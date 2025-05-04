@@ -19,7 +19,7 @@ from src.shared import config_logger, reformat_json_to_parquet
 from src.download_ticker_data import DownloadTickerData
 from src.download_etf_data import DownloadETFData
 from src.fetch_symbols import FetchSymbols
-from src.gc_functions import upload_to_gcs, blob_exists, create_bq_external_table_operator
+from src.gc_functions import upload_to_gcs, blob_exists, create_bq_external_table_operator, get_data_from_bq_operator
 from src.load_ticker_data_dlt import LoadTickerData
 
 config_logger('info')
@@ -34,6 +34,8 @@ BUCKET = os.environ.get("GCP_GCS_BUCKET")
 # BIGQUERY_DATASET = os.environ.get("GCP_BIGQUERY_DATASET", 'stocks_dev')
 BIGQUERY_DATASET_EXT = 'stocks_raw_ext'
 BIGQUERY_DATASET_DLT = 'stocks_raw'
+BIGQUERY_DATASET_USR = 'stocks_user_data'
+BQ_USR_ETFS_TABLE = 'ETFS_to_track'
 
 def get_local_raw_data_path(source, ticker):
     if source == 'price':
@@ -70,22 +72,33 @@ def fetch_symbols_for_etf(filename):
         "retries": 3,
         "retry_delay": 5
     },
-    params={
-        'ETF_symbols': Param(
-            ["QTOP", "OEF"],
-            type="array",
-            title='List of ETF Ticker symbols',
-            examples=["QTOP", "OEF"]
-            # description="E.g., ["QTOP"] for iShares Nasdaq top 30",
-        )
-    }
+    # params={
+    #     'ETF_symbols': Param(
+    #         ["QTOP", "OEF"],
+    #         type="array",
+    #         title='List of ETF Ticker symbols',
+    #         examples=["QTOP", "OEF"]
+    #         # description="E.g., ["QTOP"] for iShares Nasdaq top 30",
+    #     )
+    # }
 )
 def ingest_raw_data_dag():
-    @task
-    def get_etf_symbols_from_params(**context):
-        etf_symbols = context["params"]["ETF_symbols"]
-        return etf_symbols  
+    # @task
+    # def get_etf_symbols_from_params(**context):
+    #     etf_symbols = context["params"]["ETF_symbols"]
+    #     return etf_symbols  
 
+    @task
+    def fetch_unique_etfs():
+        logger.info(f'Fetching unique ETF symbols from {BIGQUERY_DATASET_USR}.{BQ_USR_ETFS_TABLE} table')
+        df = get_data_from_bq_operator(
+            PROJECT_ID,
+            f"SELECT DISTINCT(symbol) FROM {BIGQUERY_DATASET_USR}.{BQ_USR_ETFS_TABLE}"
+        )
+        symbols = list(df['symbol'])
+        logger.info(f'Returnig {len(symbols)} unique symbols: {symbols}')
+        return symbols
+    
     @task
     def get_etf_data(ETF_symbol: str):
         DownloadETFData(
@@ -210,7 +223,7 @@ def ingest_raw_data_dag():
     
     # ETF_symbols = '{{ params.ETF_symbols }}'
     # Parse the ETF_symbols to be processed from the input params
-    ETF_symbols = get_etf_symbols_from_params()
+    ETF_symbols = fetch_unique_etfs()
     logger.info(f'Running the ingest_raw_data_dag for {ETF_symbols}')
     
     # Control Flow
