@@ -1,6 +1,6 @@
 """
-DAG for:
-1. Downloading ETF data for a given list of ETF tickers (input parameter)
+DAG to run ingestion pipeline for a given environment (input parameter):
+1. Downloading ETF data for the ETF tickers tracked (fetched from BQ)
 2. Downloading price and info data for each ticker held by ETFs
 3. Uploading etf, price and info (fundamental) data to GCS and creating external tables in BQ
 4. Running the dlt pipeline to load and merge etf, price and info data into BQ
@@ -15,6 +15,7 @@ from airflow.models.param import Param
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
 
+from src.config import load_configs
 from src.shared import config_logger, reformat_json_to_parquet
 from src.download_ticker_data import DownloadTickerData
 from src.download_etf_data import DownloadETFData
@@ -29,13 +30,6 @@ logger = logging.getLogger(__name__)
 rootpath0 = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
 rootpath = '/opt/airflow/'
 logger.info(f'AIRFLOW_HOME: {rootpath0}')
-PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-BUCKET = os.environ.get("GCP_GCS_BUCKET")
-# BIGQUERY_DATASET = os.environ.get("GCP_BIGQUERY_DATASET", 'stocks_dev')
-BIGQUERY_DATASET_EXT = 'stocks_raw_ext'
-BIGQUERY_DATASET_DLT = 'stocks_raw'
-BIGQUERY_DATASET_USR = 'stocks_user_data'
-BQ_USR_ETFS_TABLE = 'ETFS_to_track'
 
 def get_local_raw_data_path(source, ticker):
     if source == 'price':
@@ -72,28 +66,38 @@ def fetch_symbols_for_etf(filename):
         "retries": 3,
         "retry_delay": 5
     },
-    # params={
-    #     'ETF_symbols': Param(
-    #         ["QTOP", "OEF"],
-    #         type="array",
-    #         title='List of ETF Ticker symbols',
-    #         examples=["QTOP", "OEF"]
-    #         # description="E.g., ["QTOP"] for iShares Nasdaq top 30",
-    #     )
-    # }
+    params={
+        'env': Param(
+            "prod",
+            type="string",
+            title="environment",
+            enum=["dev", "prod"]
+        )
+    }
 )
 def ingest_raw_data_dag():
-    # @task
-    # def get_etf_symbols_from_params(**context):
-    #     etf_symbols = context["params"]["ETF_symbols"]
-    #     return etf_symbols  
+
+    @task(task_id='set_push_env')
+    def set_xcompush_env(**context):
+        # Read the input parameter env
+        env = context['params'].get('env')
+        # Push env to Xcom
+        context['ti'].xcom_push(key='env', value=env)
+        # Load configs and return the DWH dictionary
+        CONFIG = load_configs(
+            config_paths={
+                'dwh': os.path.join(rootpath, 'config', 'dwh.yaml')
+                },
+            env=env
+            )
+        return CONFIG['DWH']
 
     @task
-    def fetch_unique_etfs():
-        logger.info(f'Fetching unique ETF symbols from {BIGQUERY_DATASET_USR}.{BQ_USR_ETFS_TABLE} table')
+    def fetch_unique_etfs(DWH: dict):
+        logger.info(f'Fetching unique ETF symbols from {DWH['DS_user']}.{DWH['T_etfs2track'] } table')
         df = get_data_from_bq_operator(
-            PROJECT_ID,
-            f"SELECT DISTINCT(symbol) FROM {BIGQUERY_DATASET_USR}.{BQ_USR_ETFS_TABLE}"
+            DWH['project'],
+            f"SELECT DISTINCT(symbol) FROM {DWH['DS_user']}.{DWH['T_etfs2track'] }"
         )
         symbols = list(df['symbol'])
         logger.info(f'Returnig {len(symbols)} unique symbols: {symbols}')
@@ -150,14 +154,14 @@ def ingest_raw_data_dag():
         return ticker
         
     @task
-    def ul_to_gcs(source: str, ticker: str):
+    def ul_to_gcs(source: str, ticker: str, DWH: dict):
         logger.info(f"Storing {ticker} data in GCS")
         fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
         object_name=f"{source}/{os.path.basename(fpath)}"
         if os.path.exists(fpath):
             logger.info(f"Uploading {fpath} to {object_name}")
             upload_to_gcs(
-                bucket = BUCKET,
+                bucket = DWH['bucket'],
                 object_name=object_name,
                 local_file=fpath)
         else:
@@ -165,34 +169,35 @@ def ingest_raw_data_dag():
         return ticker
     
     @task
-    def create_bq_table(source: str, ticker: str, **context):
+    def create_bq_table(source: str, ticker: str, DWH: dict, **context):
         logger.info(f"Creating external talbe in BQ for {ticker}")
         fpath = os.path.join(rootpath, 'data', source, ticker+'.parquet')
         object_name=f"{source}/{os.path.basename(fpath)}"
+        BUCKET = DWH['bucket']
         if blob_exists(BUCKET, object_name):
             fmt=os.path.basename(fpath).split('.')[1].upper()
             table_name = f'{source}_{ticker}'
             logger.info(f"Creating external table based on {fmt} file gs://{BUCKET}/{object_name}")
             operator = create_bq_external_table_operator(
-                projectID=PROJECT_ID,
+                projectID=DWH['project'],
                 bucket=BUCKET,
                 object_name=object_name,
-                dataset=BIGQUERY_DATASET_EXT,
+                dataset=DWH['DS_raw'],
                 table=table_name,
                 format=fmt)
             operator.execute(context=context)
-            logger.info(f"Created table in BQ: {BIGQUERY_DATASET_EXT}.{table_name}")
+            logger.info(f"Created table in BQ: {DWH['DS_raw']}.{table_name}")
         else:
             logger.warning(f"Blob {object_name} does not exist")
         return ticker
         
     @task
-    def run_dlt_pl(source: str, full_load: bool):
+    def run_dlt_pl(source: str, full_load: bool, DWH:dict):
         logger.info(f"Running the dlt pipeline for {source} data")
         load_ticker = LoadTickerData(
             full_load=full_load,
             dest='bigquery',
-            dataset_name=BIGQUERY_DATASET_DLT,
+            dataset_name=DWH['DS_raw'] ,
             dev_mode=False,
             log_level='info')
         if source == 'etf':
@@ -221,9 +226,12 @@ def ingest_raw_data_dag():
         deferrable=False
     )
     
-    # ETF_symbols = '{{ params.ETF_symbols }}'
+
+    # Read the input argument to set env and DWH dictionary
+    DWH = set_xcompush_env()
+
     # Parse the ETF_symbols to be processed from the input params
-    ETF_symbols = fetch_unique_etfs()
+    ETF_symbols = fetch_unique_etfs(DWH)
     logger.info(f'Running the ingest_raw_data_dag for {ETF_symbols}')
     
     # Control Flow
@@ -234,27 +242,27 @@ def ingest_raw_data_dag():
 
     @task_group(group_id="tg_etf")
     def tg_etf():
-        ETF_symbol_gcs = ul_to_gcs.partial(source='etf').expand(ticker=ETF_symbol_local)
-        etf_bqext = create_bq_table.partial(source='etf').expand(ticker=ETF_symbol_gcs)
-    dlt_pipeline_etf = run_dlt_pl(source='etf', full_load=True)
+        ETF_symbol_gcs = ul_to_gcs.partial(source='etf', DWH=DWH).expand(ticker=ETF_symbol_local)
+        etf_bqext = create_bq_table.partial(source='etf', DWH=DWH).expand(ticker=ETF_symbol_gcs)
+    dlt_pipeline_etf = run_dlt_pl(source='etf', full_load=True, DWH=DWH)
     remove_local_etf = remove_local(source='etf')
     
     # Price tasks
     price_symbol_local = get_ticker_price.expand(ticker=symbols)
     @task_group(group_id="tg_price")
     def tg_price():
-        price_symbol_gcs = ul_to_gcs.partial(source='price').expand(ticker=price_symbol_local)
-        price_symbol_bqext = create_bq_table.partial(source='price').expand(ticker=price_symbol_gcs)
-    dlt_pipeline_price = run_dlt_pl(source='price', full_load=True)
+        price_symbol_gcs = ul_to_gcs.partial(source='price', DWH=DWH).expand(ticker=price_symbol_local)
+        price_symbol_bqext = create_bq_table.partial(source='price', DWH=DWH).expand(ticker=price_symbol_gcs)
+    dlt_pipeline_price = run_dlt_pl(source='price', full_load=True, DWH=DWH)
     remove_local_price = remove_local(source='price')
     # Info tasks
     info_symbol_local = get_ticker_info.expand(ticker=symbols)
     info_symbol_local_ref = reformat_json_to_pq.partial(source='info').expand(ticker=info_symbol_local)
     @task_group(group_id="tg_info")
     def tg_info():
-        info_symbol_gcs = ul_to_gcs.partial(source='info').expand(ticker=info_symbol_local_ref)
-        info_symbol_bqext =create_bq_table.partial(source='info').expand(ticker=info_symbol_gcs)
-    dlt_pipeline_info = run_dlt_pl(source='info', full_load=True)
+        info_symbol_gcs = ul_to_gcs.partial(source='info', DWH=DWH).expand(ticker=info_symbol_local_ref)
+        info_symbol_bqext =create_bq_table.partial(source='info', DWH=DWH).expand(ticker=info_symbol_gcs)
+    dlt_pipeline_info = run_dlt_pl(source='info', full_load=True, DWH=DWH)
     remove_local_info = remove_local(source='info')
 
     # etf tasks
