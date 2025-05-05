@@ -77,11 +77,6 @@ x-airflow-common:
     # AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-keys/stocks-455113-eb2c3f563c78.json
     AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT: 'google-cloud-platform://?extra__google_cloud_platform__key_path=/opt/airflow/gcp-keys/stocks-455113-eb2c3f563c78.json'
-
-    # TODO: Please change GCP_PROJECT_ID & GCP_GCS_BUCKET, as per your config
-    GCP_PROJECT_ID: 'stocks-455113'
-    GCP_GCS_BUCKET: 'stocks-455113-raw'
-    GCP_BIGQUERY_DATASET: 'stocks_dev'
     PG_HOST: ${PG_HOST}
     PG_USER: ${PG_USER}
     PG_PASSWORD: ${PG_PASSWORD}
