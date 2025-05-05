@@ -222,6 +222,7 @@ def ingest_raw_data_dag():
     triggered_ticker_transformations_dag = TriggerDagRunOperator(
         trigger_dag_id="ticker_transformations_dag",
         task_id="triggered_ticker_transf_dag",
+        execution_date="{{ execution_date }}",
         wait_for_completion=False,
         deferrable=False
     )
