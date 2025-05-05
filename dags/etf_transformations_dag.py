@@ -16,10 +16,6 @@ logger = logging.getLogger(__name__)
 rootpath = os.environ.get("AIRFLOW_HOME")
 dbt_dir = os.path.join(rootpath, 'dbt', 'stocks_dbt')
 
-PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-BQ_DATASET = 'stocks_raw'
-BQ_ETFS_TABLE = 'etfs'
-
 
 @dag(
     schedule=None,
@@ -34,21 +30,41 @@ BQ_ETFS_TABLE = 'etfs'
 def etf_transformations_dag():
 
     @task
-    def fetch_unique_etfs():
-        logger.info(f'Fetching unique ETF symbols from {BQ_DATASET}.{BQ_ETFS_TABLE} table')
+    def pull_env(**context):
+        # Pull the value from ingestion dag's task instance
+        task_ids = 'set_push_env'
+        dag_id = 'ingest_raw_data_dag'
+        env = context['ti'].xcom_pull(
+            task_ids=task_ids,
+            key='env',
+            dag_id = dag_id
+            )
+        print(f"Pulled env from {task_ids} XCom: {env}")
+        DWH = context["ti"].xcom_pull(
+            task_ids=task_ids,
+            key="return_value",
+            dag_id = dag_id
+            )
+        return {'env': env, 'DWH': DWH}
+
+    @task
+    def fetch_unique_etfs(pulled):
+        DWH = pulled['DWH']
+        logger.info(f'Fetching unique ETF symbols from {DWH['DS_raw']}.{DWH['T_etfs']} table')
         df = get_data_from_bq_operator(
-            PROJECT_ID,
-            f"SELECT DISTINCT(fund_ticker) FROM {BQ_DATASET}.{BQ_ETFS_TABLE}"
+            DWH['project'],
+            f"SELECT DISTINCT(fund_ticker) FROM {DWH['DS_raw']}.{DWH['T_etfs']}"
         )
         symbols = list(df['fund_ticker'])
         logger.info(f'Returnig {len(symbols)} unique symbols: {symbols}')
         return symbols
 
     @task
-    def etf_tickers_combine(ETF_symbol: str):
+    def etf_tickers_combine(ETF_symbol: str, pulled: dict):
+        env = pulled['env']
         logger.info(f'etf_tickers_combine: {ETF_symbol}')
         vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
-        bash_command=f"dbt run -s etf_tickers_combine --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
+        bash_command=f"dbt run -s etf_tickers_combine --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir} --target {env}"
         result = subprocess.run(
             bash_command,
             shell=True,
@@ -60,11 +76,12 @@ def etf_transformations_dag():
         return ETF_symbol
 
     @task
-    def etf_top_ticker_prices(ETF_symbol: str):
+    def etf_top_ticker_prices(ETF_symbol: str, pulled: dict):
+        env = pulled['env']
         logger.info(f'etf_top_ticker_prices: {ETF_symbol}')
         vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
         # 'etf_top_ticker_prices',     
-        bash_command=f"dbt run -s etf_top_ticker_prices --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
+        bash_command=f"dbt run -s etf_top_ticker_prices --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir} --target {env}"
         result = subprocess.run(
             bash_command,
             shell=True,
@@ -75,11 +92,12 @@ def etf_transformations_dag():
         logger.info(result.stdout)
     
     @task
-    def etf_sector_aggregates (ETF_symbol: str):
+    def etf_sector_aggregates (ETF_symbol: str, pulled: dict):
+        env = pulled['env']
         logger.info(f'etf_sector_aggregates : {ETF_symbol}')
         vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
         #'etf_sector_aggregates',        
-        bash_command=f"dbt run -s etf_sector_aggregates --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"
+        bash_command=f"dbt run -s etf_sector_aggregates --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir} --target {env}"
         result = subprocess.run(
             bash_command,
             shell=True,
@@ -89,10 +107,11 @@ def etf_transformations_dag():
         )
         logger.info(result.stdout)
     
-    etf_symbols = fetch_unique_etfs()
-    combined_etf_symbol = etf_tickers_combine.expand(ETF_symbol=etf_symbols)
-    etf_top_ticker_prices.expand(ETF_symbol=combined_etf_symbol)
-    etf_sector_aggregates.expand(ETF_symbol=combined_etf_symbol)
+    pulled = pull_env()
+    etf_symbols = fetch_unique_etfs(pulled)
+    combined_etf_symbol = etf_tickers_combine.partial(pulled=pulled).expand(ETF_symbol=etf_symbols)
+    etf_top_ticker_prices.partial(pulled=pulled).expand(ETF_symbol=combined_etf_symbol)
+    etf_sector_aggregates.partial(pulled=pulled).expand(ETF_symbol=combined_etf_symbol)
 
 
 dag_instance = etf_transformations_dag()
