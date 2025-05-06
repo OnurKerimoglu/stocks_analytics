@@ -23,9 +23,9 @@ Here is a high-level overview of the solution architecture:
 3 main environments can be identified:
 1. A local development environment (green box): this is where the code is developed/maintained and necessary cloud services (via [Terraform](#terraform)) are managed
 2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is ran through a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed
-3. [Metabase Dashboards](#metabase-dashboard) (orange box) served to public
+3. [Streamlit Dashboard](#streamlit-dashboard) (orange box) served to public
 
-In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally the [Metabase dashboard](#metabase-dashboard) are provided. 
+In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally the [Streamlit dashboard](#streamlit-dashboard) are provided. 
 
 # Data Sources
 
@@ -215,16 +215,22 @@ These `BashOperator` tasks run dbt models that have names identical to the calli
 - [etf_sector_aggregates](dbt/stocks_dbt/models/stocks/etf_sector_aggregates.sql): this model builds on the etf_tickers_combine model, basically by applyting various aggregation functions to the fields of this table over sectors.
 - [etf_top_ticker_prices](dbt/stocks_dbt/models/stocks/etf_top_ticker_prices.sql): this model mainly choses the most important (by weight) tickers for the specified ETF (i.e., input parameter) from the stock_prices table (in [stocks_raw](#stocks_raw) dataset) by joining with the etf_tickers_combine table created by the first task.
 
-## ~~Metabase~~ Streamlit Dashboard
-For developing the dashboards, I used ~~Metabase Open Source, and for publishing I migrated to Metabase Cloud~~ (**Update:** as my trial period ended, I decided to create a [dashboard with Streamlit](https://stocks-analytics-dashboard.streamlit.app/)). It should look something like this (screenshot is from the Metabae dashboard, but the Streamlit panels are the same):
+## Streamlit Dashboard
+After initial experimentation with Metabase and Looker, I decided to use [Streamlit](https://streamlit.io)), not only because it is free to use for open source projects, but also because the flexibility it offers - I even built an admin page to manage the ETFs to be tracked. Check out the dashboard: [https://stocks-analytics-dashboard.streamlit.app/](https://stocks-analytics-dashboard.streamlit.app/)
 
-<img src="documentation/images/Dashboard_Metabase.png" alt="etf transformations dag" width="800"/>
+<!-- The first step is to choose one of the tracked ETFs to analyze:
 
+<img src="documentation/images/dashboard_etf_selection.png" alt="" width="400"/>
 
-### Explanation of Panels
+This will 
+### 
 
+<img src="documentation/images/dashboard_etf_candlestick.png" alt="" width="400"/>
+
+- *Time-Series of Top Tickers*: these are time series of top 10 tickers (filtered by weight rank) for the past 90 days (filtered by Date) from the table `etf_{ETF_symbol}_top_ticker_prices` 
+- *Time-Series of Top Tickers*: these are time series of top 10 tickers (filtered by weight rank) for the past 90 days (filtered by Date) from the table `etf_{ETF_symbol}_top_ticker_prices` 
 - *Top 10 Tickers by Weight*: This list is simply the top 10 rows of the `etf_{ETF_symbol}_tickers_combined` table, sorted by `weight`, in descending order
 - *Total Weight of Tickers per Sector*: This pie chart is based on a metabase 'question', which calculates adjusted weights of sectors in  `etf_IVV_sector_aggregates` table by multiplying the weights by $\frac{100}{\Sigma{w}}$, where $w$ are the original weights. This way, the adjusted weights presented in this chart always sum up to 100, even if there have been errors in fetching/processing some ticker data
-- *Bollinger Recommendation for Tickers*: This pie chart reflects the counts of tickers for each BR class (see [Ticker Transformations](#ticker-transformations-dag)), as obtained with grouping by `bollinger_recommendation` field from the table `etf_{ETF_symbol}_tickers_combined` 
-- *Time-Series of Top Tickers*: these are time series of top 10 tickers (filtered by weight rank) for the past 90 days (filtered by Date) from the table `etf_{ETF_symbol}_top_ticker_prices` 
+- *Bollinger Recommendation for Tickers*: This pie chart reflects the counts of tickers for each BR class (see [Ticker Transformations](#ticker-transformations-dag)), as obtained with grouping by `bollinger_recommendation` field from the table `etf_{ETF_symbol}_tickers_combined`  -->
+
 
