@@ -182,7 +182,7 @@ def ingest_raw_data_dag():
                 projectID=DWH['project'],
                 bucket=BUCKET,
                 object_name=object_name,
-                dataset=DWH['DS_raw'],
+                dataset=DWH['DS_rawext'],
                 table=table_name,
                 format=fmt)
             operator.execute(context=context)
@@ -223,6 +223,7 @@ def ingest_raw_data_dag():
         trigger_dag_id="ticker_transformations_dag",
         task_id="triggered_ticker_transf_dag",
         execution_date="{{ execution_date }}",
+        reset_dag_run=True,
         wait_for_completion=False,
         deferrable=False
     )
@@ -282,6 +283,9 @@ def ingest_raw_data_dag():
     info_symbol_local_ref >> dlt_pipeline_info >> remove_local_info
 
     # trigger ticker_transformations_dag
+    remove_local_etf >> triggered_ticker_transformations_dag
+    remove_local_price >> triggered_ticker_transformations_dag
+    remove_local_info >> triggered_ticker_transformations_dag
     dlt_pipeline_info >> triggered_ticker_transformations_dag 
     dlt_pipeline_price >> triggered_ticker_transformations_dag
 
