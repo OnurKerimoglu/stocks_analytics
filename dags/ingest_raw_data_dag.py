@@ -59,7 +59,7 @@ def fetch_symbols_for_etf(filename):
     schedule='0 1 * * *',
     start_date=days_ago(1), 
     catchup=False,
-    description="Ingest raw data for a given ETF ticker",
+    description="Start the pipeline for a given environment",
     doc_md = __doc__,
     default_args={
         "owner": "Onur",
