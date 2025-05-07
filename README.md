@@ -221,11 +221,19 @@ The DAG has 2 main branches: one to process ETF data (branch *A*), another to pr
 Note that, for some of these tasks, input arguments are provided as lists with `.expand()` function (made available to the dag function by airflow's `@task` decorator), so that copies of the task are dynamically created at runtime and mapped to the elements of the list, which is an airflow feature known as [Dynamic Task Mapping](https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/dynamic-task-mapping.html).
 
 ## Ticker Transformations DAG
-The [ticker_transformations_dag](dags/ticker_transformations_dag.py) takes the input parameter `ETF_symbol`. It contains a dbt task wrapped inside a `BashOperator`, and a trigger for the [etf transformations dag](#etf-transformations-dag): 
+
+### Resolution of the Environment
+The [ticker transformations dag](dags/ticker_transformations_dag.py) can take `env` input parameter, which is configured for three options: `dev`, `prod` or `upstream` (default). The environment to take effect is resolved with following logic:
+
+- `branch_env`: this is a `BranchPythonOperator`, which returns `pull_env` as the task if the `env` input parameter is `upstream`, otherwise (i.e., for `dev` or `prod`), it returns `skip_pull_env`, which is an `EmptyOperator`.
+- `pull_env`: this task Xcom-pulls `env` parameter, which was pushed by the `set_push_env` task under [Ingestion DAG](#ingestion-dag). Finally, it pushes the value of `env` to Xcom as `upstream_env`.
+- `resolve_env`: this task is defined with `trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS`, so that it runs when any of the upstream tasks (i.e., `branch_env` or `pull_env`) succeeds. It reads the input parameter `env`; if its value is `upstream`, it attempts to pull the Xcom `upstream_env`. If the return value turns out to be `None`, which happens for scheduled tasks (apprently due to the mistmatching `execution_date`), it falls back to a default environment, which is globally defined in the module to be `prod`. If the input arg `env` is not `upstream`, it is taken as is. Then the final value is pushed to Xcom as `resolved_env`
+
+The resolution of the environment is represented by the first 4 tasks left of the following image:
 
 <img src="documentation/images/airflow_ticker_transformations_dag.png" alt="ticker transformations dag" width="480"/>
 
-This `BashOperator` issues a dbt CLI command to run [price_technicals_lastday.sql](dbt/stocks_dbt/models/stocks/price_technicals_lastday.sql), purpose of which is, for each ticker in the stocks_prices table in the [stocks_raw](#stocks_raw) dataset, calculating technical indicators that can be summarized for the last day available (so that one record can be produced per ticker in the target table), and write these results into the, price_technicals_lastday table in the [stocks_refined](#stocks_refined) datasets. Currently, the only indicator calculated is the (Bollinger Band Strategy)[https://en.wikipedia.org/wiki/Bollinger_Bands], according to which,
+The next task, `price_technicals_lastday` is the only task that actually does something in this DAG: it issues a dbt CLI command to run [price_technicals_lastday.sql](dbt/stocks_dbt/models/stocks/price_technicals_lastday.sql), for the `resolved_env` (see above) as its `target`. Purpose of this model is, for each ticker in the stocks_prices table in the [stocks_raw](#stocks_raw) dataset, calculating technical indicators that can be summarized for the last day available (so that one record can be produced per ticker in the target table), and write these results into the, price_technicals_lastday table in the [stocks_refined](#stocks_refined) datasets. Currently, the only indicator calculated is the (Bollinger Band Strategy)[https://en.wikipedia.org/wiki/Bollinger_Bands], according to which,
 
 $$
 \textrm{BR} = 
@@ -238,17 +246,22 @@ $$
 \right.
 $$
 
-where BR stands for the Bollinger Recommendation, P is the (closing) Price, $\mu_n(P)$ and $\sigma_n(P)$ are the $n$-day rolling average and standard deviation of Price for the time period, and $K$ is a factor (in the current implementation, $n$=30, $K$=2). As in the current implementation we need the BR only for the last day, the calculation truncates to simple average and standard deviation calculations for the chosen period ($n$=30 days).  
+where BR stands for the Bollinger Recommendation, P is the (closing) Price, $\mu_n(P)$ and $\sigma_n(P)$ are the $n$-day rolling average and standard deviation of Price for the time period, and $K$ is a factor (in the current implementation, $n$=30, $K$=2). As in the current implementation we need the BR only for the last day, the calculation truncates to simple average and standard deviation calculations for the chosen period ($n$=30 days).
+
+The final task, `triggered_etf_transformations_dag` is a trigger for the next DAG. 
 
 ## ETF Transformations DAG
-The [etf_transformations_dag](dags/etf_transformations_dag.py) takes an input parameter `ETF_symbol`, and is comprised of 3 `BashOperator` tasks, 2 of which branches from the first task, and can run in parallel:
+This  [etf transformations dag](dags/etf_transformations_dag.py) can take `env` as its input parameter, but can also pull the `env` defined upstream, exactly as described for the previous DAG (see: [Resolution of the Environment](#resolution-of-the-environment)). These are again the first 4 tasks left of the image:
 
 <img src="documentation/images/airflow_etf_transformations_dag.png" alt="etf transformations dag" width="720"/>
 
-These `BashOperator` tasks run dbt models that have names identical to the calling tasks:
+Then the `load_configs_task` loads the config files according to the `resolved_env`, and returns a dictionary containing the GC bucket, dataset and table names, which is needed for the next task, `fetch_unique_etfs`. This task, like in the case of [Ingestion DAG](#ingestion-dag), fetches all unique ETFs from the <${env}.DS_user>.<${shared}.T_etfs2track table (see [data warehouse](#data-warehouse)), and returns them as a list.
+
+Subsequent 3 tasks are then mapped to each of these `ETF_symbols` returned by the `fetch_unique_etfs` task (i.e., for 3 ETFs in the example run shown in the image above). These tasks run dbt models for the `resolved_env` (see above) as its `target`, names of which are identical to those of the calling tasks:
 - [etf_tickers_combine](dbt/stocks_dbt/models/stocks/etf_tickers_combine.sql): This model first filters the ticker symbols, weights and sectors of companies that are held for a chosen ETF (as specified the input parameter) from the etfs table (in [stocks_raw](#stocks_raw) datasets), then combines these with a subset of fields from the stock_info table (in [stocks_raw](#stocks_raw) datasets) and price_technicals_lastday table (in the [stocks_refined](#stocks_refined) datasets), and stores the result in Table: `etf_{ETF_symbol}_tickers_combined` (see [Ticker Transformations DAG](#ticker-transformations-dag))
 - [etf_sector_aggregates](dbt/stocks_dbt/models/stocks/etf_sector_aggregates.sql): this model builds on the etf_tickers_combine model, basically by applyting various aggregation functions to the fields of this table over sectors.
 - [etf_top_ticker_prices](dbt/stocks_dbt/models/stocks/etf_top_ticker_prices.sql): this model mainly choses the most important (by weight) tickers for the specified ETF (i.e., input parameter) from the stock_prices table (in [stocks_raw](#stocks_raw) dataset) by joining with the etf_tickers_combine table created by the first task.
+
 
 # Streamlit Dashboard
 After initial experimentation with Metabase and Looker, I decided to use [Streamlit](https://streamlit.io)), not only because it is free to use for open source projects, but also because the flexibility it offers - I even built an admin page to manage the ETFs to be tracked. Check out the dashboard: [https://stocks-analytics-dashboard.streamlit.app/](https://stocks-analytics-dashboard.streamlit.app/)
