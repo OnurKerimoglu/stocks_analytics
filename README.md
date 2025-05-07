@@ -22,10 +22,10 @@ Here is a high-level overview of the solution architecture:
 
 3 main environments can be identified:
 1. A local development environment (green box): this is where the code is developed/maintained and necessary cloud services (via [Terraform](#terraform)) are managed
-2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is ran through a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed
+2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is ran in a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed in a data lake and data warehouse
 3. [Streamlit Dashboard](#streamlit-dashboard) (orange box) served to public
 
-In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally the [Streamlit dashboard](#streamlit-dashboard) are provided. 
+In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally a brief description and link for an interactive [Streamlit dashboard](#streamlit-dashboard) are provided. 
 
 # Data Sources
 
@@ -79,16 +79,26 @@ then inside the VM, move the file to the expected location with `mkdir gcp-keys;
 See section: [Airflow](#airflow) for the instructions on setting up the Airflow environment.
 
 ## Data Lake
-All the raw data are stored as .parquet files in a GCS bucket, split into three folders: 
+All the raw data are stored as .parquet files in two GCS buckets, one for `prod` and one for `dev` environments, with the following structure:
 
-<img src="documentation/images/data_lake_structure.png" alt="data_lake_structure" width="120"/>
+```
+<shared.project>
+├── <${env}.bucket>
+    ├── etf
+    ├── info
+    ├── price
+    ├── <${env}.DS_raw>
+        ├── <shared.T_etfs>
+        ├── <shared.T_info>
+        └── <shared.T_prices>
+```
+where <x.y> are in reference to blocks and variables defined in the config file [Docker/airflow/config/dwh.yaml](Docker/airflow/config/dwh.yaml) and `${env}` is either `dev` or `prod`. Note that, once the GCS resources are created with Terraform (see above), these folders do not need to be created manually. 
 
-Contents of these folders are probably self-evident (see the previous section for the contents of files and how they are generated):
-- etf: .parquet files for each of the ETFs being tracked. See the [ETF Compositions](#etf-compositions) 
-- info: .parquet files for each company ticker held by any ETF (no duplicates for holdings contained by multiple ETFs). See the [Stock Information and Prices](#stock-information-and-prices) section above for the contents.
-- prices: same as for the info files, but containing the daily price history of the company. See the [Stock Information and Prices](#stock-information-and-prices)  section above for the contents. This table is clustered by `symbol` column for improved query performance.
-
-
+These folders contain the following:
+- `etf`: .parquet files for each of the ETFs being tracked. See the [ETF Compositions](#etf-compositions) 
+- `info`: .parquet files for each company ticker held by any ETF (no duplicates for holdings contained by multiple ETFs). See the [Stock Information and Prices](#stock-information-and-prices) section above for the contents.
+- `prices`: same as for the info files, but containing the daily price history of the company. See the [Stock Information and Prices](#stock-information-and-prices)  section above for the contents. This table is clustered by `symbol` column for improved query performance.
+- `<${env}.DS_raw>`: this folder serve as the staging area for the dlt pipelines (see *run_dlt_pl* task under [Ingestion DAG](#ingestion-dag) that load the data to the datawarehouse, and as such, the subfolders mirror the tables under the `<${env}.DS_raw>` datasets.
 
 ## Data Warehouse
 
