@@ -83,11 +83,11 @@ All the raw data are stored as .parquet files in two GCS buckets, one for `prod`
 
 ```
 <shared.project>
-├── <${env}.bucket>
+└── <${env}.bucket>
     ├── etf
     ├── info
     ├── price
-    ├── <${env}.DS_raw>
+    └──  <${env}.DS_raw>
         ├── <shared.T_etfs>
         ├── <shared.T_info>
         └── <shared.T_prices>
@@ -102,16 +102,31 @@ These folders contain the following:
 
 ## Data Warehouse
 
-The data warehouse contains 3 dataset groups, 2 of which have dev/staging and production variants (therefore totalling 5 datasets):
+The data warehouse contains 4 dataset groups, each having `dev/prod` variants:
 
-<img src="documentation/images/data_warehouse_structure.png" alt="data_warehouse_structure" width="200"/>
+```
+<shared.project>
+├── <${env}.DS_raw>
+|   ├── etfs
+|   ├── stock_info
+|   └── stock_prices
+├── <${env}.DS_rawext>
+|   ├── etf_${etf_symbol}
+|   ├── info_${holding_symbol}
+|   └── price_${holding_symbol}
+├── <${env}.DS_refined>
+|   ├── etf_${etf_symbol}_sector_aggregates
+|   ├── etf_${etf_symbol}_tickers_combined
+|   ├── etf_${etf_symbol}_top_ticker_prices
+|   └── price_technicals_lastday
+└──  <${env}.DS_user>
+    └── <${shared}.T_etfs2track>
+```
+where (as in the case of data lake explained above), <x.y> are in reference to blocks and variables defined in the config file [Docker/airflow/config/dwh.yaml](Docker/airflow/config/dwh.yaml) and `${env}` is either `dev` or `prod`.
 
 These dataset groups contain following tables:
 
-### stocks_raw_ext
-contains an external table for each .parquet file in the [data lake](#data-lake), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow).
-
-### stocks_raw
+### <${env}.DS_raw>
 This dataset has two variants for development (suffix: _staging) and production environments (no suffix), where the tables are created by the [dlt (data load tool)](#dlt), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
 - etfs: concateneted [ETF Compositions](#etf-compositions) for all ETFs being tracked, as identified by `fund_ticker` column
 - stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
@@ -119,16 +134,23 @@ This dataset has two variants for development (suffix: _staging) and production 
 
 This design follows the [star schema](https://en.wikipedia.org/wiki/Star_schema), where the stock_price is a rapidly changing fact table, and the etfs and stock_info are the slower-changing dimensions tables.
 
-### stocks_refined
+### <${env}.DS_rawext>
+contains external tables for each .parquet file in `etf`, `info` and `price` folders in [data lake](#data-lake), called from [Data Ingestion DAG](#data-ingestion). Specifically;
+- `etf_${etf_symbol}`: contain tables for each `etf_symbol` being tracked, listing the holdings tracked by the etfs (typically 10s/100s of holdings per ETF)
+- `info_${holding_symbol}`: contain info tables for each `holding_symbol` contained in any of the ETFs being tracked, listing the fundamental holding data such P/E ratio, for instance (one record per holding)
+- `price_${holding_symbol}`: contain price tables for each `holding_symbol` contained in any of the ETFs being tracked, listing daily price (open, close, high, low, volume) histories (typically 100s/1000s of records per holding)
+
+### <${env}.DS_refined>
 This dataset has also two variants for the development (indicated with _dev suffix) and production (indicated with _prod suffix) environments, and contains transformed data produced by the [dbt (data build tool)](#dbt), called from [Data Transformation DAG's](#data-transformation), orchestrated by [Airflow](#Airflow). They comprise the following tables:
-- etf_{etf_name}_sector_aggregates: for each ETF being tracked, sectoral aggregations: in particular, sum of weights of tickers held by the ETF in each sector 
-- etf_{etf_name}_tickers_combined: for each ETF being tracked, combination of select fields from raw etf and info tables, and the price_technicals_last_day (see below)
-- etf_{etf_name}_top_ticker_prices: for each ETF being tracked, price (close) of tickers held by the ETF.
-- price_technicals_lastday: for each ticker tracked by any ETF, the technical indicators for the last day. 
+- `etf_${etf_name}_sector_aggregates`: for each ETF being tracked, sectoral aggregations: in particular, sum of weights of tickers held by the ETF in each sector 
+- `etf_${etf_name}_tickers_combined`: for each ETF being tracked, combination of select fields from raw etf and info tables, and the price_technicals_last_day (see below)
+- `etf_${etf_name}_top_ticker_prices`: for each ETF being tracked, price (close) of tickers held by the ETF.
+- `price_technicals_lastday`: for each ticker tracked by any ETF, the technical indicators for the last day. 
 
-For the details of the contents of etf_{etf_name} tables, see [ETF Transformations DAGs](#etf-transformations-dag), and for the others (currently only 'price_technicals_lastday'), see [Ticker Transformations DAG](#ticker-transformations-dag).
+For the details of the contents of etf_{etf_name} tables, see [ETF Transformations DAGs](#etf-transformations-dag), and for the others (currently only 'price_technicals_lastday'), see [Ticker Transformations DAG](#ticker-transformations-dag). This dataset also follows a star schema, where the price_technicals_lastday is the rapidly changing fact table, and the `etf_{etf_name}_*` tables are the dimension tables.
 
-As the [stocks_raw](#stocks_raw) datasets, this dataset follows a star schema, where the price_technicals_lastday is the rapidly changing fact table, and the etf_{etf_name}_* tables are the dimension tables.
+### <${env}.DS_user>
+This dataset contains only the <${shared}.T_etfs2track> table so far, which lists ETF symbols tracked by each user (email). This table is (for now) controlled by a system admin, and is (read-only) accessed by the [Ingestion DAG](#ingestion-dag) to retrieve the list of ETFs to be processed.  
 
 # Tools and Technical Setup
 ## Cloning the repositories
