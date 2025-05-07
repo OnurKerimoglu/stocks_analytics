@@ -25,7 +25,7 @@ Here is a high-level overview of the solution architecture:
 2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is ran in a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed in a data lake and data warehouse
 3. [Streamlit Dashboard](#streamlit-dashboard) (orange box) served to public
 
-In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [Data Ingestion](#data-ingestion) and [Data Transformation](#data-transformations) pipelines and finally a brief description and link for an interactive [Streamlit dashboard](#streamlit-dashboard) are provided. 
+In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [data processing](#data-processing-pipelines) pipelines and finally a brief description and link for an interactive [Streamlit dashboard](#streamlit-dashboard) are provided. 
 
 # Data Sources
 
@@ -127,7 +127,7 @@ where (as in the case of data lake explained above), <x.y> are in reference to b
 These dataset groups contain following tables:
 
 ### <${env}.DS_raw>
-This dataset has two variants for development (suffix: _staging) and production environments (no suffix), where the tables are created by the [dlt (data load tool)](#dlt), called from [Data Ingestion DAG](#data-ingestion), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
+This dataset has two variants for development (suffix: _staging) and production environments (no suffix), where the tables are created by the [dlt (data load tool)](#dlt), called from [Ingestion DAG](#ingestion-dag), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
 - etfs: concateneted [ETF Compositions](#etf-compositions) for all ETFs being tracked, as identified by `fund_ticker` column
 - stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
 - stock_price: concatenated [Stock Prices](#stock-prices) for all company tickers being tracked, as identified by `symbol` column. 
@@ -135,13 +135,13 @@ This dataset has two variants for development (suffix: _staging) and production 
 This design follows the [star schema](https://en.wikipedia.org/wiki/Star_schema), where the stock_price is a rapidly changing fact table, and the etfs and stock_info are the slower-changing dimensions tables.
 
 ### <${env}.DS_rawext>
-contains external tables for each .parquet file in `etf`, `info` and `price` folders in [data lake](#data-lake), called from [Data Ingestion DAG](#data-ingestion). Specifically;
+contains external tables for each .parquet file in `etf`, `info` and `price` folders in [data lake](#data-lake), called from [Ingestion DAG](#ingestion-dag). Specifically;
 - `etf_${etf_symbol}`: contain tables for each `etf_symbol` being tracked, listing the holdings tracked by the etfs (typically 10s/100s of holdings per ETF)
 - `info_${holding_symbol}`: contain info tables for each `holding_symbol` contained in any of the ETFs being tracked, listing the fundamental holding data such P/E ratio, for instance (one record per holding)
 - `price_${holding_symbol}`: contain price tables for each `holding_symbol` contained in any of the ETFs being tracked, listing daily price (open, close, high, low, volume) histories (typically 100s/1000s of records per holding)
 
 ### <${env}.DS_refined>
-This dataset has also two variants for the development (indicated with _dev suffix) and production (indicated with _prod suffix) environments, and contains transformed data produced by the [dbt (data build tool)](#dbt), called from [Data Transformation DAG's](#data-transformation), orchestrated by [Airflow](#Airflow). They comprise the following tables:
+This dataset has also two variants for the development (indicated with _dev suffix) and production (indicated with _prod suffix) environments, and contains transformed data produced by the [dbt (data build tool)](#dbt), called from data transformation DAG's (see: [data processing pipelines](#data-processing-pipelines)), orchestrated by [Airflow](#Airflow). They comprise the following tables:
 - `etf_${etf_name}_sector_aggregates`: for each ETF being tracked, sectoral aggregations: in particular, sum of weights of tickers held by the ETF in each sector 
 - `etf_${etf_name}_tickers_combined`: for each ETF being tracked, combination of select fields from raw etf and info tables, and the price_technicals_last_day (see below)
 - `etf_${etf_name}_top_ticker_prices`: for each ETF being tracked, price (close) of tickers held by the ETF.
@@ -157,10 +157,10 @@ This dataset contains only the <${shared}.T_etfs2track> table so far, which list
 The repository should be cloned with the `--recursive` argument, i.e., `git clone --recursive https://github.com/OnurKerimoglu/stocks_analytics.git`, such that the [stocks_dbt](https://github.com/OnurKerimoglu/stocks_dbt.git) repository is pulled as a submodule into the `dbt` folder (see the [Airflow](#Airflow) section below for information on the integration of dbt with Airflow).
 
 ## dlt
-Some part of the ingestion, specifically, loading the raw ticker data (info and price) to the datawarehouse is done via [dlt (data load tool)](https://dlthub.com/), orchestrated with [Airflow](#Airflow) (see [Data Ingestion DAG](#data-ingestion) below for the process details). 
+Some part of the ingestion, specifically, loading the raw ticker data (info and price) to the datawarehouse is done via [dlt (data load tool)](https://dlthub.com/), orchestrated with [Airflow](#Airflow) (see [Data Ingestion DAG](#ingestion-dag) below for the process details). 
 
 ## dbt
-Data transformations are done with [dbt (data build tool) -core](https://docs.getdbt.com/docs/core/installation-overview), orchestrated with [Airflow](#Airflow) (see [Data Transformations](#data-transformations) below for the process details).
+Data transformations are done with [dbt (data build tool) -core](https://docs.getdbt.com/docs/core/installation-overview), orchestrated with [Airflow](#Airflow) (see data transformation DAGs under [Data Processing Pipelines](#data-processing-pipelines) for details).
 
 ## Airflow
 
@@ -190,9 +190,12 @@ Note that, here the bucket_url is required for being able to make use of the [st
 4. (If Airflow is hosted on a remote machine): the webserver port needs to be forwarded to a `local-port`, from which Airflow UI can be displayed. On a terminal `ssh -L <local-port>:localhost:8081 <user>@stocks-scheduler -N` (note that [Docker-compose.yml](Docker/airflow/docker-compose.yaml) specifies the non-default 8081 as the webserver port).
 
 # Data Processing Pipelines
-## Data Ingestion
 
-### Ingestion DAG
+Data processing pipelines are scheduled and orchestrated via Airflow. Scheduled operations (see below) will run for the default `prod` environment, whereas for the manual runs, the user can specify the environment when triggering the dags:
+
+<img src="documentation/images/airflow_ingestion_dag_environment_choice.png" alt="environment choice" width="400"/>
+
+## Ingestion DAG
 The [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) is the only scheduled dag that runs once a week, specifically on Saturday at 5 AM CET. It comprises all ingestion-tasks required for a given ETF (provided as an input argument `ETF_symbol`), so it is somewhat complex: 
 
 <!---
@@ -215,12 +218,10 @@ The DAG has 2 main branches: one to process ETF data (branch *A*), another to pr
 
 Note that, for some of these tasks, input arguments are provided as lists with `.expand()` function (made available to the dag function by airflow's `@task` decorator), so that copies of the task are dynamically created at runtime and mapped to the elements of the list, which is an airflow feature known as [Dynamic Task Mapping](https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/dynamic-task-mapping.html). The number of copied tasks are shown in the DAG diagram in square brackets.
 
-## Data Transformations
-
-### Ticker Transformations DAG
+## Ticker Transformations DAG
 The [ticker_transformations_dag](dags/ticker_transformations_dag.py) takes the input parameter `ETF_symbol`. It contains a dbt task wrapped inside a `BashOperator`, and a trigger for the [etf transformations dag](#etf-transformations-dag): 
 
-<img src="documentation/images/airflow_ticker_transformations_dag.png" alt="ticker transformations dag" width="320"/>
+<img src="documentation/images/airflow_ticker_transformations_dag.png" alt="ticker transformations dag" width="480"/>
 
 This `BashOperator` issues a dbt CLI command to run [price_technicals_lastday.sql](dbt/stocks_dbt/models/stocks/price_technicals_lastday.sql), purpose of which is, for each ticker in the stocks_prices table in the [stocks_raw](#stocks_raw) dataset, calculating technical indicators that can be summarized for the last day available (so that one record can be produced per ticker in the target table), and write these results into the, price_technicals_lastday table in the [stocks_refined](#stocks_refined) datasets. Currently, the only indicator calculated is the (Bollinger Band Strategy)[https://en.wikipedia.org/wiki/Bollinger_Bands], according to which,
 
@@ -237,17 +238,17 @@ $$
 
 where BR stands for the Bollinger Recommendation, P is the (closing) Price, $\mu_n(P)$ and $\sigma_n(P)$ are the $n$-day rolling average and standard deviation of Price for the time period, and $K$ is a factor (in the current implementation, $n$=30, $K$=2). As in the current implementation we need the BR only for the last day, the calculation truncates to simple average and standard deviation calculations for the chosen period ($n$=30 days).  
 
-### ETF Transformations DAG
+## ETF Transformations DAG
 The [etf_transformations_dag](dags/etf_transformations_dag.py) takes an input parameter `ETF_symbol`, and is comprised of 3 `BashOperator` tasks, 2 of which branches from the first task, and can run in parallel:
 
-<img src="documentation/images/airflow_etf_transformations_dag.png" alt="etf transformations dag" width="320"/>
+<img src="documentation/images/airflow_etf_transformations_dag.png" alt="etf transformations dag" width="720"/>
 
 These `BashOperator` tasks run dbt models that have names identical to the calling tasks:
 - [etf_tickers_combine](dbt/stocks_dbt/models/stocks/etf_tickers_combine.sql): This model first filters the ticker symbols, weights and sectors of companies that are held for a chosen ETF (as specified the input parameter) from the etfs table (in [stocks_raw](#stocks_raw) datasets), then combines these with a subset of fields from the stock_info table (in [stocks_raw](#stocks_raw) datasets) and price_technicals_lastday table (in the [stocks_refined](#stocks_refined) datasets), and stores the result in Table: `etf_{ETF_symbol}_tickers_combined` (see [Ticker Transformations DAG](#ticker-transformations-dag))
 - [etf_sector_aggregates](dbt/stocks_dbt/models/stocks/etf_sector_aggregates.sql): this model builds on the etf_tickers_combine model, basically by applyting various aggregation functions to the fields of this table over sectors.
 - [etf_top_ticker_prices](dbt/stocks_dbt/models/stocks/etf_top_ticker_prices.sql): this model mainly choses the most important (by weight) tickers for the specified ETF (i.e., input parameter) from the stock_prices table (in [stocks_raw](#stocks_raw) dataset) by joining with the etf_tickers_combine table created by the first task.
 
-## Streamlit Dashboard
+# Streamlit Dashboard
 After initial experimentation with Metabase and Looker, I decided to use [Streamlit](https://streamlit.io)), not only because it is free to use for open source projects, but also because the flexibility it offers - I even built an admin page to manage the ETFs to be tracked. Check out the dashboard: [https://stocks-analytics-dashboard.streamlit.app/](https://stocks-analytics-dashboard.streamlit.app/)
 
 <!-- The first step is to choose one of the tracked ETFs to analyze:
