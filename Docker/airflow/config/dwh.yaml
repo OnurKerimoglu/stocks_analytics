@@ -1,16 +1,17 @@
 shared:
   project: stocks-455113
-  bucket: stocks-455113-raw
   T_etfs: etfs
   T_info: stock_info
   T_prices: stock_prices
   T_etfs2track: ETFS_to_track
 dev:
+  bucket: stocks-455113-raw-dev
   DS_raw: stocks_raw_dev
   DS_rawext: stocks_raw_ext_dev
   DS_refined: stocks_refined_dev
   DS_user: stocks_user_data_dev
 prod:
+  bucket: stocks-455113-raw
   DS_raw: stocks_raw
   DS_rawext: stocks_raw_ext
   DS_refined: stocks_refined
