@@ -41,6 +41,12 @@ variable "gcs_bucket_name" {
   default     = "stocks-455113-raw"
 }
 
+variable "gcs_dev_bucket_name" {
+  description = "My Storage Bucket Name"
+  #Update the below to a unique bucket name
+  default     = "stocks-455113-raw-dev"
+}
+
 variable "gcs_storage_class" {
   description = "Bucket Storage Class"
   default     = "STANDARD"
