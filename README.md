@@ -264,4 +264,4 @@ Subsequent 3 tasks are then mapped to each of these `ETF_symbols` returned by th
 
 
 # Streamlit Dashboard
-After initial experimentation with Metabase and Looker, I decided to use [Streamlit](https://streamlit.io)), not only because it is free to use for open source projects, but also because the flexibility it offers - I even built an admin page to manage the ETFs to be tracked. Check out the dashboard: [https://stocks-analytics-dashboard.streamlit.app/](https://stocks-analytics-dashboard.streamlit.app/), and its [README.md](dashboards/stocks_analytics_dashboard/README.md).
+After initial experimentation with Metabase and Looker, I decided to use [Streamlit](https://streamlit.io)), not only because it is free to use for open source projects, but also because the flexibility it offers - I even built an admin page to manage the ETFs to be tracked. Check out the dashboard: [https://stocks-analytics-dashboard.streamlit.app/](https://stocks-analytics-dashboard.streamlit.app/), and its code repository (including a readme) here: [https://github.com/OnurKerimoglu/stocks_analytics_dashboard](https://github.com/OnurKerimoglu/stocks_analytics_dashboard).
