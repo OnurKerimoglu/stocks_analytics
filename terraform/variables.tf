@@ -91,3 +91,9 @@ variable "gce_vm2_boot_disk_size" {
   description = "Compute Engine VM2 Boot Size"
   default     = 30
 }
+
+variable "ssh_user_1" {sensitive=true}
+variable "ssh_user_2" {sensitive=true}
+
+variable "public_key_path_1" {}
+variable "public_key_path_2" {}

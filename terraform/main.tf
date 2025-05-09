@@ -109,4 +109,12 @@ module "gcp_compute_engine_vm2" {
       ports    = ["22", "8080"]
     },
   }
+  metadata = {
+    ssh-keys = join("\n", [
+    "${var.ssh_user_1}:${file(var.public_key_path_1)}",
+    "${var.ssh_user_2}:${file(var.public_key_path_2)}",
+    # Add more as needed
+  ])
+  }
 }
+
