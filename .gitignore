@@ -13,6 +13,7 @@ data/*.csv
 !data/*.default_stocks.csv
 
 Docker/airflow/logs/*
+Docker/airflow/docker-compose.override.yml
 *.env
 
 terraform/terraform.tfstate*
