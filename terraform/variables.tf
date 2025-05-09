@@ -20,7 +20,7 @@ variable "zone" {
 variable "region" {
   description = "Region"
   #Update the below to your desired region
-  default     = "europe-west1-b"
+  default     = "europe-west1"
 }
 
 variable "location" {
