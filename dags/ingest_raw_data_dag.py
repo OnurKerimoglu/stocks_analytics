@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Set constants
 rootpath0 = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
+credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 rootpath = '/opt/airflow/'
 logger.info(f'AIRFLOW_HOME: {rootpath0}')
 
@@ -96,7 +97,7 @@ def ingest_raw_data_dag():
     def fetch_unique_etfs(DWH: dict):
         logger.info(f'Fetching unique ETF symbols from {DWH['DS_user']}.{DWH['T_etfs2track'] } table')
         df = get_data_from_bq_operator(
-            DWH['project'],
+            credentials_path,
             f"SELECT DISTINCT(symbol) FROM {DWH['DS_user']}.{DWH['T_etfs2track'] }"
         )
         symbols = list(df['symbol'])

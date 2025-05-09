@@ -17,6 +17,7 @@ config_logger('info')
 logger = logging.getLogger(__name__)
 
 rootpath = os.environ.get("AIRFLOW_HOME")
+credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 dbt_dir = os.path.join(rootpath, 'dbt', 'stocks_dbt')
 DEFAULT_ENV = "prod"
 
@@ -107,7 +108,7 @@ def etf_transformations_dag():
     def fetch_unique_etfs(DWH):
         logger.info(f'Fetching unique ETF symbols from {DWH['DS_raw']}.{DWH['T_etfs']} table')
         df = get_data_from_bq_operator(
-            DWH['project'],
+            credentials_path,
             f"SELECT DISTINCT(fund_ticker) FROM {DWH['DS_raw']}.{DWH['T_etfs']}"
         )
         symbols = list(df['fund_ticker'])

@@ -2,6 +2,7 @@ import logging
 
 from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateExternalTableOperator
 from google.cloud import storage, bigquery
+from google.oauth2 import service_account
 
 from src.shared import config_logger
 
@@ -78,11 +79,25 @@ def create_bq_external_table_operator(
     return BQoperator
 
 def get_data_from_bq_operator(
-        PROJECT_ID: str,
+        credentials_path: str,
         QUERY: str
     ):
-    client = bigquery.Client(project=PROJECT_ID)
-
+    credentials = service_account.Credentials.from_service_account_file(
+        credentials_path,
+        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    )
+    logger.info(f"Instantiating BQ Client with credentials from {credentials_path}")
+    client = bigquery.Client(
+        credentials=credentials)
     query_job = client.query(QUERY)  # API request
     data = query_job.result()  # Waits for query to finish
     return data.to_dataframe() # Return as a pandas DataFrame
+
+
+if __name__ == "__main__":
+    credentials_path = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
+    df = get_data_from_bq_operator(
+        credentials_path,
+        f"SELECT DISTINCT(symbol) FROM stocks_user_data.ETFS_to_track"
+    )
+    print(df)
