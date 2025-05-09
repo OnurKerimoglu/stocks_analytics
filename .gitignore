@@ -18,6 +18,7 @@ Docker/airflow/logs/*
 terraform/terraform.tfstate*
 terraform/.terraform*
 terraform/plan_*
+terraform/terraform.tfvars
 
 dbt/logs/*
 
