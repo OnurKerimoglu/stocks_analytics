@@ -118,3 +118,16 @@ module "gcp_compute_engine_vm2" {
   }
 }
 
+resource "google_artifact_registry_repository" "airflow_repo" {
+  provider             = google
+  location             = var.region
+  repository_id        = var.repo_name
+  description          = "Artifact Registry for Airflow Docker Images"
+  format               = "DOCKER"
+  docker_config {
+    immutable_tags = false
+  }
+  lifecycle {
+    ignore_changes = [docker_config]
+  }
+}
