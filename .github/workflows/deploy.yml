@@ -12,7 +12,7 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
       REGION: europe-west1
       PROJECT_ID: stocks-455113
-      REPO: my-airflow-repo       # Your GAR repository
+      REPO: stocks-analytics-repo
 
     steps:
       - name: Checkout code
@@ -35,6 +35,10 @@ jobs:
 
       - name: Tag and push images to GAR
         run: |
+          export REGION=${{ env.REGION }}
+          export PROJECT_ID=${{ env.PROJECT_ID }}
+          export REPO=${{ env.REPO }}
+          export IMAGE_TAG=${{ env.IMAGE_TAG }}
           SERVICES=("airflow-scheduler" "airflow-webserver" "airflow-triggerer" "airflow-worker")
           for SERVICE in "${SERVICES[@]}"; do
             LOCAL_IMAGE="airflow-${SERVICE}"
