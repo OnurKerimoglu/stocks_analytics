@@ -1,6 +1,3 @@
 [submodule "dbt/stocks"]
 	path = dbt/stocks_dbt
 	url = https://github.com/OnurKerimoglu/stocks_dbt.git
-[submodule "dashboards/stocks_analytics_dashboard"]
-	path = dashboards/stocks_analytics_dashboard
-	url = https://github.com/OnurKerimoglu/stocks_analytics_dashboard
