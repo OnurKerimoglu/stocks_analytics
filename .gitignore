@@ -21,6 +21,7 @@ terraform/.terraform*
 terraform/plan_*
 terraform/terraform.tfvars
 
+.github/workflows_obsolete/*
 dbt/logs/*
 
 *.duckdb
