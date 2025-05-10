@@ -7,10 +7,12 @@ DAG to run ingestion pipeline for a given environment (input parameter):
 5. Removing local data
 """
 import ast
-import os
+import json
 import logging
+import os
 
 from airflow.decorators import dag, task, task_group
+from airflow.models import Variable
 from airflow.models.param import Param
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
@@ -31,6 +33,33 @@ rootpath0 = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
 credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 rootpath = '/opt/airflow/'
 logger.info(f'AIRFLOW_HOME: {rootpath0}')
+
+# Use an f-string with the dictionary for clarity
+dlt_secrets_template = """[destination.bigquery]
+location = \"{bq_location}\"
+
+[destination.filesystem]
+bucket_url = \"gs://{bucket_url}\"
+
+[destination.bigquery.credentials]
+project_id = \"{project_id}\"
+private_key = \"{private_key}\"
+client_email = \"{client_email}\""""
+
+def escape_string(s: str) -> str:
+    return s.encode('unicode_escape').decode('utf-8')
+
+def get_dlt_config_values(DWH):
+    credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    with open(credentials_path) as f:
+        credentials = json.load(f)
+    config_values = {
+        'bq_location': DWH['bq_location'],
+        'bucket_url': DWH['bucket'],
+        'project_id': credentials['project_id'].strip(),
+        'private_key': credentials['private_key'].strip(),
+        'client_email': credentials['client_email'].strip()}
+    return config_values
 
 def get_local_raw_data_path(source, ticker):
     if source == 'price':
@@ -91,6 +120,18 @@ def ingest_raw_data_dag():
                 },
             env=env
             )
+        DWH = CONFIG['DWH']
+        logger.info(f"Setting admin vars for env: {env}")
+        config_values = get_dlt_config_values(DWH)
+        escaped_values = {k: escape_string(v) for k, v in config_values.items()}
+        dlt_secrets = dlt_secrets_template.format(**escaped_values)
+        Variable.set(
+            key="dlt_secrets_toml", 
+            value= dlt_secrets,
+            description = f"set for env:{env} by ingest_raw_data_dag/set_xcompush_env task"
+            )
+        # dlt_secrets_toml is equivalent to a local {DLT_DIR}/secrets.toml (where DLT_DIR is by default ~/.dlt)
+        # see: https://dlthub.com/docs/walkthroughs/deploy-a-pipeline/deploy-with-airflow-composer
         return CONFIG['DWH']
 
     @task
@@ -230,7 +271,7 @@ def ingest_raw_data_dag():
     )
     
 
-    # Read the input argument to set env and DWH dictionary
+    # Read the input argument to set env and DWH dictionary, and set admin env variables
     DWH = set_xcompush_env()
 
     # Parse the ETF_symbols to be processed from the input params
