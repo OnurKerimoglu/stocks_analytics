@@ -170,7 +170,7 @@ Data transformations are done with [dbt (data build tool) -core](https://docs.ge
         - `docker compose -f Docker/airflow/docker-compose.yaml up` to start the containers
     - Save the Airflow UUID (output of `echo -e "AIRFLOW_UID=$(id -u)"`) into Docker/airflow/.env together with other parameters that might be relevant (see the [.env_example](Docker/airflow/.env_example))
 
-2. Running dbt from Airflow requires an Airflow varaible named `dlt_secrets_toml`  (equivalent to a {DLT_DIR}/secrets.toml when running dlt directly). Setting this environment variable is done automatically by the first task of the [Ingestion DAG](#ingestion-dag). If required, it can also be set manually in Airflow UI, under Admin > Variables, with the following content:
+2. Running dbt from Airflow requires an Airflow variable named `dlt_secrets_toml`  (equivalent to a {DLT_DIR}/secrets.toml when running dlt directly). Setting this environment variable is done automatically by the first task of the [Ingestion DAG](#ingestion-dag). If required, it can also be set manually in Airflow UI, under Admin > Variables, with the following content:
 ```
 [destination.bigquery]
 location = ****
@@ -196,7 +196,7 @@ Data processing pipelines are scheduled and orchestrated via Airflow. Scheduled 
 <img src="documentation/images/airflow_ingestion_dag_environment_choice.png" alt="environment choice" width="400"/>
 
 ## Ingestion DAG
-The [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) is the only scheduled dag that runs once a week, specifically on Saturday at 5 AM CET. It comprises all ingestion-tasks, so it is fairly complex. An example run that processed the data for 3 ETFs, which contained 173 unique holdings is shown here:
+The [ingest_raw_data_dag](dags/ingest_raw_data_dag.py) is the only scheduled dag that runs once a week, specifically on Saturday at 1 AM CET. It comprises all ingestion-tasks, so it is fairly complex. An example run that processed the data for 3 ETFs, which contained 173 unique holdings is shown here:
 
 <!---
 ![airflow ingestion dag](documentation/images/airflow_ingestion_dag.png)

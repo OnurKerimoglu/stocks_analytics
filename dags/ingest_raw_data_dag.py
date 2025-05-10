@@ -86,7 +86,7 @@ def fetch_symbols_for_etf(filename):
     return symbols
     
 @dag(
-    schedule='0 1 * * *',
+    schedule='0 1 * * 6',
     start_date=days_ago(1), 
     catchup=False,
     description="Start the pipeline for a given environment",
