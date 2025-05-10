@@ -60,30 +60,37 @@ module "gcp_cloud_platform" {
   display_name = "Service Account for Compute Engine"
 }
 
-# module "gcp_compute_engine_vm1" {
-#   source       = "./modules/google_compute_engine"
-#   service_name = var.gce_vm1_service_name
+module "gcp_compute_engine_vm1" {
+  source       = "./modules/google_compute_engine"
+  service_name = var.gce_vm1_service_name
 
-#   region       = var.region
-#   zone         = var.zone
-#   machine_type = var.gce_vm1_machine_type
-#   boot_disk_image = var.gce_vm1_boot_disk_image
-#   boot_disk_size = var.gce_vm1_boot_disk_size
+  region       = var.region
+  zone         = var.zone
+  machine_type = var.gce_vm1_machine_type
+  boot_disk_image = var.gce_vm1_boot_disk_image
+  boot_disk_size = var.gce_vm1_boot_disk_size
 
-#   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
-#   firewall_name                = "airflow-rule"
-#   tags                         = ["http-server", "https-server", "airflow-rule"]
-#   allow = {
-#     1 = {
-#       protocol = "icmp"
-#       ports    = null
-#     },
-#     2 = {
-#       protocol = "tcp"
-#       ports    = ["22", "8080"]
-#     },
-#   }
-# }
+  google_service_account_email = module.gcp_cloud_platform.google_service_account_email
+  firewall_name                = "airflow-rule"
+  tags                         = ["http-server", "https-server", "airflow-rule"]
+  allow = {
+    1 = {
+      protocol = "icmp"
+      ports    = null
+    },
+    2 = {
+      protocol = "tcp"
+      ports    = ["22", "8080"]
+    },
+  }
+  metadata = {
+    ssh-keys = join("\n", [
+    "${var.ssh_user_1}:${file(var.public_key_path_1)}",
+    "${var.ssh_user_2}:${file(var.public_key_path_2)}",
+    # Add more as needed
+  ])
+  }
+}
 
 
 module "gcp_compute_engine_vm2" {
