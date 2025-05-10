@@ -1,5 +1,6 @@
 shared:
   project: stocks-455113
+  bq_location: europe-west3
   T_etfs: etfs
   T_info: stock_info
   T_prices: stock_prices
