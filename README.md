@@ -22,10 +22,10 @@ Here is a high-level overview of the solution architecture:
 
 3 main environments can be identified:
 1. A local development environment (green box): this is where the code is developed/maintained and necessary cloud services (via [Terraform](#terraform)) are managed
-2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is ran in a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed in a data lake and data warehouse
+2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is pulled from Github (automated via [scripts/startup.sh](scripts/startup.sh), which is set with the creation of the compute engine resource with Terraform), ran in a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed in a data lake and data warehouse
 3. [Streamlit Dashboard](#streamlit-dashboard) (orange box) served to public
 
-In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [data processing](#data-processing-pipelines) pipelines and finally a brief description and link for an interactive [Streamlit dashboard](#streamlit-dashboard) are provided. 
+In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [data integration](#data-integration) pipelines and finally a brief description and link for an interactive [Streamlit dashboard](#streamlit-dashboard) are provided. 
 
 # Data Sources
 
@@ -141,7 +141,7 @@ contains external tables for each .parquet file in `etf`, `info` and `price` fol
 - `price_${holding_symbol}`: contain price tables for each `holding_symbol` contained in any of the ETFs being tracked, listing daily price (open, close, high, low, volume) histories (typically 100s/1000s of records per holding)
 
 ### <${env}.DS_refined>
-This dataset has also two variants for the development (indicated with _dev suffix) and production (indicated with _prod suffix) environments, and contains transformed data produced by the [dbt (data build tool)](#dbt), called from data transformation DAG's (see: [data processing pipelines](#data-processing-pipelines)), orchestrated by [Airflow](#Airflow). They comprise the following tables:
+This dataset has also two variants for the development (indicated with _dev suffix) and production (indicated with _prod suffix) environments, and contains transformed data produced by the [dbt (data build tool)](#dbt), called from data transformation DAG's (see: [data integration](#data-integration)), orchestrated by [Airflow](#Airflow). They comprise the following tables:
 - `etf_${etf_name}_sector_aggregates`: for each ETF being tracked, sectoral aggregations: in particular, sum of weights of tickers held by the ETF in each sector 
 - `etf_${etf_name}_tickers_combined`: for each ETF being tracked, combination of select fields from raw etf and info tables, and the price_technicals_last_day (see below)
 - `etf_${etf_name}_top_ticker_prices`: for each ETF being tracked, price (close) of tickers held by the ETF.
@@ -152,25 +152,24 @@ For the details of the contents of etf_{etf_name} tables, see [ETF Transformatio
 ### <${env}.DS_user>
 This dataset contains only the <${shared}.T_etfs2track> table so far, which lists ETF symbols tracked by each user (email). This table is (for now) controlled by a system admin, and is (read-only) accessed by the [Ingestion DAG](#ingestion-dag) to retrieve the list of ETFs to be processed.  
 
-# Tools and Technical Setup
+# Technical Setup and Tools
+In Linux environments, an end-to-end technical setup can be handled with [scripts/init.sh](scripts/init.sh) (which will be copied to the VM and ran there once during the creation of the compute engine resource with Terraform). No additonal steps should be necessary, but here are a few words on the role of tools being used, and some notes on the technicalities.
+
 ## Cloning the repositories
 The repository should be cloned with the `--recursive` argument, i.e., `git clone --recursive https://github.com/OnurKerimoglu/stocks_analytics.git`, such that the [stocks_dbt](https://github.com/OnurKerimoglu/stocks_dbt.git) repository is pulled as a submodule into the `dbt` folder (see the [Airflow](#Airflow) section below for information on the integration of dbt with Airflow).
 
-## dlt
-Some part of the ingestion, specifically, loading the raw ticker data (info and price) to the datawarehouse is done via [dlt (data load tool)](https://dlthub.com/), orchestrated with [Airflow](#Airflow) (see [Data Ingestion DAG](#ingestion-dag) below for the process details). 
-
-## dbt
-Data transformations are done with [dbt (data build tool) -core](https://docs.getdbt.com/docs/core/installation-overview), orchestrated with [Airflow](#Airflow) (see data transformation DAGs under [Data Processing Pipelines](#data-processing-pipelines) for details).
-
 ## Airflow
+Airflow is responsible for the orchestration and scheduling of the [Data Integration](#data-integration) pipelines using python routines, [dlt](#dlt) and [dbt](#dbt). As mentioned above, the whole technical setup can be performed with [scripts/init.sh](scripts/init.sh), but in here is an outline of the steps.
 
-1. build and run the docker image (see https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html for general information on how to run airflow with docker compose. Here project specific steps are provided). 
+1. install docker and docker compose (for ubuntu: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository) and start the docker service
+
+2. build and run the docker image (see https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html for general information on how to run airflow with docker compose. Here project specific steps are provided). 
     -  Under the project root, issue:
         - `docker compose -f Docker/airflow/docker-compose.yaml build` to build the containers
         - `docker compose -f Docker/airflow/docker-compose.yaml up` to start the containers
-    - Save the Airflow UUID (output of `echo -e "AIRFLOW_UID=$(id -u)"`) into Docker/airflow/.env together with other parameters that might be relevant (see the [.env_example](Docker/airflow/.env_example))
+    - Save the Airflow UUID (output of `echo -e "AIRFLOW_UID=$(id -u)"`) into Docker/airflow/.env (see the [.env_example](Docker/airflow/.env_example))
 
-2. Running dbt from Airflow requires an Airflow variable named `dlt_secrets_toml`  (equivalent to a {DLT_DIR}/secrets.toml when running dlt directly). Setting this environment variable is done automatically by the first task of the [Ingestion DAG](#ingestion-dag). If required, it can also be set manually in Airflow UI, under Admin > Variables, with the following content:
+2. Running [dlt](#dlt) from Airflow requires an Airflow variable named `dlt_secrets_toml`  (equivalent to a {DLT_DIR}/secrets.toml when running dlt directly). Setting this environment variable is done automatically by the first task of the [Ingestion DAG](#ingestion-dag). But iff needed, it can also be set manually in Airflow UI, under Admin > Variables, with the following content:
 ```
 [destination.bigquery]
 location = ****
@@ -185,13 +184,19 @@ client_email = ****
 ```
 Note that, here the bucket_url is required for being able to make use of the [staging functionality of dlt](https://dlthub.com/docs/dlt-ecosystem/staging).
 
-3. no additional configuration step is needed for dbt. For info, the dbt models are made available to Airflow while building the container with [docker-compose.yaml](Docker/airflow/docker-compose.yaml) by mounting the `dbt` folder  to `/opt/airflow/dbt`, which contains the dbt repository [stocks_dbt](https://github.com/OnurKerimoglu/stocks_dbt.git) as a submodule, which in turn contains the (profiles.yml) file inside a [config](dbt/stocks/dbt/config) folder (which by default is located under the dbt folder, e.g., $HOME/.dbt on Unix systems.). This non-default location for the profiles.yml file requires its specification while making a call to the dbt client (e.g., as in `bash_command=f"dbt run -s <model-name>  --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"`, where, `dbt_dir` points to `/opt/airflow/dbt/stocks_dbt`). 
+3. no additional configuration step is needed for [dbt](#dbt). For info, the dbt models are made available to Airflow while building the container with [docker-compose.yaml](Docker/airflow/docker-compose.yaml) by mounting the `dbt` folder  to `/opt/airflow/dbt`, which contains the dbt repository [stocks_dbt](https://github.com/OnurKerimoglu/stocks_dbt.git) as a submodule, which in turn contains the (profiles.yml) file inside a [config](dbt/stocks/dbt/config) folder (which by default is located under the dbt folder, e.g., $HOME/.dbt on Unix systems.). This non-default location for the profiles.yml file requires its specification while making a call to the dbt client (e.g., as in `bash_command=f"dbt run -s <model-name>  --profiles-dir {dbt_dir}/config --project-dir {dbt_dir}"`, where, `dbt_dir` points to `/opt/airflow/dbt/stocks_dbt`). 
 
 4. (If Airflow is hosted on a remote machine): the webserver port needs to be forwarded to a `local-port`, from which Airflow UI can be displayed. On a terminal `ssh -L <local-port>:localhost:8081 <user>@stocks-scheduler -N` (note that [Docker-compose.yml](Docker/airflow/docker-compose.yaml) specifies the non-default 8081 as the webserver port).
 
-# Data Processing Pipelines
+## dlt
+Loading of the raw ticker data (info and price) to the datawarehouse is done via [dlt (data load tool)](https://dlthub.com/). 
 
-Data processing pipelines are scheduled and orchestrated via Airflow. Scheduled operations (see below) will run for the default `prod` environment, whereas for the manual runs, the user can specify the environment when triggering the dags:
+## dbt
+Data transformations are done primarily with [dbt (data build tool) -core](https://docs.getdbt.com/docs/core/installation-overview).
+
+
+# Data Integration
+Data integration is done with ELT method: Data is first extracted and loaded to the data warehouse (by the [Ingestion DaG](#ingestion-dag)), which are then transformed (by [Ticker Transformation DAG](#ticker-transformations-dag) and [ETF Transformation DAG](#etf-transformations-dag). All pipelines are scheduled and orchestrated via [Airflow](#Airflow). Scheduled operations (see below) are run for the default `prod` environment, whereas for the manual runs, the user can specify the environment (`prod` or `dev`) when triggering the dags:
 
 <img src="documentation/images/airflow_ingestion_dag_environment_choice.png" alt="environment choice" width="400"/>
 
