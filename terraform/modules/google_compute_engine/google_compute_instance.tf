@@ -35,6 +35,19 @@ resource "google_compute_instance" "default" {
     destination = "${var.gcp_key_path_dest}"
   }
 
+  # Copy init.sh to VM and run it once
+  provisioner "file" {
+    source      = "${var.init_script_path}"
+    destination = "init.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x init.sh",
+      "sudo ./init.sh"
+    ]
+  }
+
   connection {
     type        = "ssh"
     user        = "${var.ssh_user_1}"

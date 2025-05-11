@@ -97,3 +97,8 @@ variable "gcp_key_path_dest" {
   description = "path to the gcp service account key file on the VM"
   type        = string
 }
+
+variable "init_script_path" {
+  description = "absolute path to the init script file on the host machine"
+  type        = string
+}

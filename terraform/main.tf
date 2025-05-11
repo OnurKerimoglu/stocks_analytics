@@ -73,6 +73,7 @@ module "gcp_compute_engine_vm1" {
   private_key_path_1 = var.private_key_path_1
   gcp_key_path_src       = var.gcp_key_path_src
   gcp_key_path_dest       = var.gcp_key_path_dest
+  init_script_path = abspath("${path.module}/../${var.init_script_relpath}")
 
   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
   firewall_name                = "airflow-rule-1"
@@ -93,6 +94,8 @@ module "gcp_compute_engine_vm1" {
     "${var.ssh_user_2}:${file(var.public_key_path_2)}",
     # Add more as needed
   ])
+  startup-script  = file("${path.module}/../scripts/startup.sh")
+  shutdown-script = file("${path.module}/../scripts/shutdown.sh")
   }
 }
 
@@ -110,6 +113,7 @@ module "gcp_compute_engine_vm2" {
   private_key_path_1 = var.private_key_path_1
   gcp_key_path_src       = var.gcp_key_path_src
   gcp_key_path_dest       = var.gcp_key_path_dest
+  init_script_path = file("${path.module}/../${var.init_script_relpath}")
 
   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
   firewall_name                = "airflow-rule"
@@ -130,6 +134,8 @@ module "gcp_compute_engine_vm2" {
     "${var.ssh_user_2}:${file(var.public_key_path_2)}",
     # Add more as needed
   ])
+  startup-script  = file("${path.module}/../scripts/startup.sh")
+  shutdown-script = file("${path.module}/../scripts/shutdown.sh")
   }
 }
 

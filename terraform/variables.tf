@@ -100,3 +100,10 @@ variable "repo_name" {
 
 variable "gcp_key_path_src" {sensitive=true}
 variable "gcp_key_path_dest" {sensitive=true}
+
+
+variable "init_script_relpath" {
+  description = "path to the init script file relative to the repo root"
+  type        = string
+  default     = "scripts/init.sh"
+}
