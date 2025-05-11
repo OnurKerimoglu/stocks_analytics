@@ -2,7 +2,9 @@
 set -e
 
 LOG_FILE="/var/log/startup-script.log"
+# LOG_FILE="startup-script.log"
 REPO_DIR="stocks-analytics"
+rm $LOG_FILE
 
 {
 echo "[$(date)] --- Shutdown script begins ---"
