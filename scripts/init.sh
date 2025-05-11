@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-INIT_FLAG="~/.VM_init-complete"
+INIT_FLAG="${HOME}/.VM_init-complete"
 
 if [[ -f "$INIT_FLAG" ]]; then
   echo "[INIT] Already initialized, skipping."
@@ -12,8 +12,6 @@ LOG_FILE="/var/log/init-script.log"
 REPO_DIR="stocks-analytics"
 REPO_URL="https://github.com/OnurKerimoglu/stocks_analytics.git"
 
-rm $LOG_FILE
-
 # Start logging
 {
 echo "[$(date)] --- Startup script begins ---"
@@ -24,7 +22,6 @@ apt -y install git
   echo "installing docker compose"
   sudo apt-get -y install ca-certificates curl gnupg
   sudo install -m 0755 -d /etc/apt/keyrings
-  rm /etc/apt/keyrings/docker.gpg
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   sudo chmod a+r /etc/apt/keyrings/docker.gpg
   # Add the repository to Apt sources:
@@ -36,11 +33,11 @@ apt -y install git
   apt -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 #fi
 sudo service docker start
-sudo usermod -aG docker $USER
+sudo usermod -aG docker onur
 
 if ! [ -d "/secrets/gcp-keys" ]; then
   echo "creating folder gcp-keys"
-  sudo mkdir /secrets/gcp-keys
+  sudo mkdir -p /secrets/gcp-keys
 fi
 shopt -s nullglob
 json_files=(*.json)
@@ -53,15 +50,16 @@ echo "Cloning repo for the first time to $REPO_DIR..."
 git clone --recursive $REPO_URL $REPO_DIR
 
 echo "Starting Airflow..."
+cd $REPO_DIR
 docker compose -f Docker/airflow/docker-compose.yaml build
 docker compose -f Docker/airflow/docker-compose.yaml up -d
 
-sleep 180
+# sleep 180
 echo -e "AIRFLOW_UID=$(id -u)" > Docker/airflow/.env
 
 docker compose -f Docker/airflow/docker-compose.yaml down
 echo "Done starting and setting up Airflow"
-} >> "$LOG_FILE" 2>&1k
+} >> "$LOG_FILE" 2>&1
 
 # Mark init as done
 touch "$INIT_FLAG"
