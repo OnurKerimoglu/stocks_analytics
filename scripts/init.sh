@@ -7,6 +7,7 @@ if [[ -f "$INIT_FLAG" ]]; then
   exit 0
 fi
 
+USER_NAME="onur"  #i.e., $USER that will be operating airflow
 LOG_FILE="/var/log/init-script.log"
 # LOG_FILE="init-script.log"
 REPO_DIR="stocks-analytics"
@@ -33,7 +34,8 @@ apt -y install git
   apt -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 #fi
 sudo service docker start
-sudo usermod -aG docker onur
+sudo usermod -aG docker ${USER_NAME}
+# here $USER won't work, as the init.sh will run as root during the creation of the VM, and not as $USER
 
 if ! [ -d "/secrets/gcp-keys" ]; then
   echo "creating folder gcp-keys"
