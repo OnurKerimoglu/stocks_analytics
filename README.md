@@ -23,9 +23,9 @@ Here is a high-level overview of the solution architecture:
 3 main environments can be identified:
 1. A local development environment (green box): this is where the code is developed/maintained and necessary cloud services (via [Terraform](#terraform)) are managed
 2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is pulled from Github (automated via [scripts/startup.sh](scripts/startup.sh), which is set with the creation of the compute engine resource with Terraform), ran in a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed in a data lake and data warehouse
-3. [Streamlit Dashboard](#streamlit-dashboard) (orange box) served to public
+3. [Streamlit Web-App](#streamlit-web-app) (orange box) that contains publicly accessible dashboards and admin interfaces to browse and manage ETFs to track.
 
-In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [data integration](#data-integration) pipelines and finally a brief description and link for an interactive [Streamlit dashboard](#streamlit-dashboard) are provided. 
+In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [data integration](#data-integration) pipelines and finally a brief description and link for an interactive [Streamlit Web-App](#streamlit-web-app) are provided. 
 
 # Data Sources
 
@@ -268,5 +268,5 @@ Subsequent 3 tasks are then mapped to each of these `ETF_symbols` returned by th
 - [etf_top_ticker_prices](dbt/stocks_dbt/models/stocks/etf_top_ticker_prices.sql): this model mainly choses the most important (by weight) tickers for the specified ETF (i.e., input parameter) from the stock_prices table (in [stocks_raw](#stocks_raw) dataset) by joining with the etf_tickers_combine table created by the first task.
 
 
-# Streamlit Dashboard
-After initial experimentation with Metabase and Looker, I decided to use [Streamlit](https://streamlit.io)), not only because it is free to use for open source projects, but also because the flexibility it offers - I even built an admin page to manage the ETFs to be tracked. Check out the dashboard: [https://stocks-analytics-dashboard.streamlit.app/](https://stocks-analytics-dashboard.streamlit.app/), and its code repository (including a readme) here: [https://github.com/OnurKerimoglu/stocks_analytics_dashboard](https://github.com/OnurKerimoglu/stocks_analytics_dashboard).
+# Streamlit Web-App
+After initial experimentation with Metabase and Looker, I decided to build a [Streamlit](https://streamlit.io)) web app, not only because it is free to use for open source projects, but also because the flexibility it offers. The web-app contains not only publicly accessible dashboard ([https://stocks-analytics-dashboard.streamlit.app/](https://stocks-analytics-dashboard.streamlit.app/)) but also admin pages that facilitate browse and manage ETFs to track. Check out the code repository (and its readme for a more detailed description) here: [https://github.com/OnurKerimoglu/stocks_analytics_dashboard](https://github.com/OnurKerimoglu/stocks_analytics_dashboard).
