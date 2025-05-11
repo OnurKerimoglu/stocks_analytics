@@ -77,3 +77,23 @@ variable "source_ranges" {
   type        = string
   default     = "0.0.0.0/0"
 }
+
+variable "ssh_user_1" {
+  description = "ssh user name of the VM"
+  type        = string
+}
+
+variable "private_key_path_1" {
+  description = "first private rsa key path of the host machine"
+  type        = string
+}
+
+variable "gcp_key_path_src" {
+  description = "path to the gcp service account key file on the host machine"
+  type        = string
+}
+
+variable "gcp_key_path_dest" {
+  description = "path to the gcp service account key file on the VM"
+  type        = string
+}

@@ -30,4 +30,15 @@ resource "google_compute_instance" "default" {
     email  = var.google_service_account_email
     scopes = ["cloud-platform"]
   }
+  provisioner "file" {
+    source      = "${var.gcp_key_path_src}"
+    destination = "${var.gcp_key_path_dest}"
+  }
+
+  connection {
+    type        = "ssh"
+    user        = "${var.ssh_user_1}"
+    private_key = "${file(var.private_key_path_1)}"
+    host        = self.network_interface[0].access_config[0].nat_ip
+  }
 }

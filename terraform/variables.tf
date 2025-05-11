@@ -1,11 +1,3 @@
-variable "credentials" {
-  description = "My Credentials"
-  default     = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
-  #ex: if you have a directory where this file is called keys with your service account json file
-  #saved there as my-creds.json you could use default = "./keys/my-creds.json"
-}
-
-
 variable "project" {
   description = "Project"
   default     = "stocks-455113"
@@ -98,8 +90,13 @@ variable "ssh_user_2" {sensitive=true}
 variable "public_key_path_1" {}
 variable "public_key_path_2" {}
 
+variable "private_key_path_1" {}
+
 variable "repo_name" {
   description = "The Artifact Registry repository name"
   default     = "stocks-analytics-repo"
   type        = string
 }
+
+variable "gcp_key_path_src" {sensitive=true}
+variable "gcp_key_path_dest" {sensitive=true}

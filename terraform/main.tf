@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "google" {
-  credentials = file(var.credentials)
+  credentials = file(var.gcp_key_path_src)
   project     = var.project
   region      = var.region
 }
@@ -69,9 +69,13 @@ module "gcp_compute_engine_vm1" {
   machine_type = var.gce_vm1_machine_type
   boot_disk_image = var.gce_vm1_boot_disk_image
   boot_disk_size = var.gce_vm1_boot_disk_size
+  ssh_user_1         = var.ssh_user_1
+  private_key_path_1 = var.private_key_path_1
+  gcp_key_path_src       = var.gcp_key_path_src
+  gcp_key_path_dest       = var.gcp_key_path_dest
 
   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
-  firewall_name                = "airflow-rule"
+  firewall_name                = "airflow-rule-1"
   tags                         = ["http-server", "https-server", "airflow-rule"]
   allow = {
     1 = {
@@ -102,6 +106,10 @@ module "gcp_compute_engine_vm2" {
   machine_type = var.gce_vm2_machine_type
   boot_disk_image = var.gce_vm2_boot_disk_image
   boot_disk_size = var.gce_vm2_boot_disk_size
+  ssh_user_1         = var.ssh_user_1
+  private_key_path_1 = var.private_key_path_1
+  gcp_key_path_src       = var.gcp_key_path_src
+  gcp_key_path_dest       = var.gcp_key_path_dest
 
   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
   firewall_name                = "airflow-rule"
