@@ -1,7 +1,13 @@
 #!/bin/bash
 set -e
 
+LOG_FILE="/var/log/startup-script.log"
 REPO_DIR="stocks-analytics"
+REPO_URL="https://github.com/OnurKerimoglu/stocks_analytics.git"
+
+# Start logging
+{
+echo "[$(date)] --- Startup script begins ---"
 
 if [ -d "$REPO_DIR/.git" ]; then
   echo "Repo exists at $REPO_DIR. Pulling latest changes..."
@@ -12,7 +18,7 @@ if [ -d "$REPO_DIR/.git" ]; then
   git submodule update --recursive --remote
 else
   echo "Cloning repo for the first time to $REPO_DIR..."
-  git clone --recursive https://github.com/OnurKerimoglu/stocks_analytics.git $REPO_DIR
+  git clone --recursive $REPO_URL $REPO_DIR
 fi
 
 cd $REPO_DIR
@@ -24,3 +30,4 @@ docker compose -f Docker/airflow/docker-compose.yaml up
 echo -e "AIRFLOW_UID=$(id -u)" > Docker/airflow/.env
 
 echo "Done starting and setting up Airflow"
+} >> "$LOG_FILE" 2>&1
