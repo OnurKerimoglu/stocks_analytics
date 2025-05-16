@@ -1,6 +1,12 @@
+import logging
 import os
 
 from pyspark.sql import SparkSession
+from src.shared import config_logger
+
+
+config_logger('info')
+logger = logging.getLogger(__name__)
 
 def main():
 
@@ -9,9 +15,10 @@ def main():
         os.path.dirname(
             os.path.abspath(__file__)))
     datapath= os.path.join(rootpath, 'data')
-
+    
+    logger.info(f'datpath determined: {datapath}')
+    # .master("spark://L54Ku2004:7077") \
     spark = SparkSession.builder \
-        .master("spark://L54Ku2004:7077") \
         .appName("test spark example") \
         .getOrCreate()
     
