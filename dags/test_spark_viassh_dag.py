@@ -6,8 +6,7 @@ from airflow.providers.ssh.operators.ssh import SSHOperator
     schedule_interval=None,
     catchup=False
 )
-def test_spark_dag():
-
+def test_spark_viassh_dag():
     test_remote_spark_job = SSHOperator(
         task_id="run_spark_job",
         ssh_conn_id="spark_ssh_connection",
@@ -15,4 +14,4 @@ def test_spark_dag():
     )
     test_remote_spark_job
 
-test_spark_dag()
+test_spark_viassh_dag()
