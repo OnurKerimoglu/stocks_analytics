@@ -1,12 +1,15 @@
 #!/bin/bash
 set -e
 
+USER_NAME="onur"  #to know where the REPO_DIR is
 LOG_FILE="/var/log/startup-script.log"
-# LOG_FILE="startup-script.log"
-REPO_DIR="stocks-analytics"
+REPO_DIR="/home/${USER_NAME}/stocks-analytics"
 REPO_URL="https://github.com/OnurKerimoglu/stocks_analytics.git"
 
-rm $LOG_FILE
+if [ -f $LOG_FILE ]; then
+  echo "removing log file: ${LOG_FILE}"
+  rm $LOG_FILE
+fi
 
 # Start logging
 {

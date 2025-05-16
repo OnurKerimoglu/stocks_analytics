@@ -1,11 +1,16 @@
 #!/bin/bash
 set -e
 
-LOG_FILE="/var/log/startup-script.log"
-# LOG_FILE="startup-script.log"
-REPO_DIR="stocks-analytics"
-rm $LOG_FILE
+USER_NAME="onur"  #to know where the REPO_DIR is
+LOG_FILE="/var/log/shutdown-script.log"
+REPO_DIR="/home/${USER_NAME}/stocks-analytics"
 
+if [ -f ${LOG_FILE} ]; then
+  echo "removing the log file: ${LOG_FILE}"  
+  rm $LOG_FILE
+fi
+
+# start logging
 {
 echo "[$(date)] --- Shutdown script begins ---"
 echo "Shutting down Airflow..."
