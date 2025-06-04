@@ -87,7 +87,7 @@ def fetch_symbols_for_etf(filename):
     
 @dag(
     schedule='0 1 * * 6',
-    start_date=days_ago(1), 
+    start_date=days_ago(3), 
     catchup=True,
     description="Start the pipeline for a given environment",
     doc_md = __doc__,
@@ -284,44 +284,44 @@ def ingest_raw_data_dag():
 
     symbols = fetch_unique_symbols_for_etfs(ETF_symbols)
 
-    @task_group(group_id="tg_etf")
-    def tg_etf():
-        ETF_symbol_gcs = ul_to_gcs.partial(source='etf', DWH=DWH).expand(ticker=ETF_symbol_local)
-        etf_bqext = create_bq_table.partial(source='etf', DWH=DWH).expand(ticker=ETF_symbol_gcs)
+    # @task_group(group_id="tg_etf")
+    # def tg_etf():
+    #     ETF_symbol_gcs = ul_to_gcs.partial(source='etf', DWH=DWH).expand(ticker=ETF_symbol_local)
+    #     etf_bqext = create_bq_table.partial(source='etf', DWH=DWH).expand(ticker=ETF_symbol_gcs)
     dlt_pipeline_etf = run_dlt_pl(source='etf', full_load=True, DWH=DWH)
     remove_local_etf = remove_local(source='etf')
     
     # Price tasks
     price_symbol_local = get_ticker_price.expand(ticker=symbols)
-    @task_group(group_id="tg_price")
-    def tg_price():
-        price_symbol_gcs = ul_to_gcs.partial(source='price', DWH=DWH).expand(ticker=price_symbol_local)
-        price_symbol_bqext = create_bq_table.partial(source='price', DWH=DWH).expand(ticker=price_symbol_gcs)
+    # @task_group(group_id="tg_price")
+    # def tg_price():
+    #     price_symbol_gcs = ul_to_gcs.partial(source='price', DWH=DWH).expand(ticker=price_symbol_local)
+    #     price_symbol_bqext = create_bq_table.partial(source='price', DWH=DWH).expand(ticker=price_symbol_gcs)
     dlt_pipeline_price = run_dlt_pl(source='price', full_load=True, DWH=DWH)
     remove_local_price = remove_local(source='price')
     # Info tasks
     info_symbol_local = get_ticker_info.expand(ticker=symbols)
     info_symbol_local_ref = reformat_json_to_pq.partial(source='info').expand(ticker=info_symbol_local)
-    @task_group(group_id="tg_info")
-    def tg_info():
-        info_symbol_gcs = ul_to_gcs.partial(source='info', DWH=DWH).expand(ticker=info_symbol_local_ref)
-        info_symbol_bqext =create_bq_table.partial(source='info', DWH=DWH).expand(ticker=info_symbol_gcs)
+    # @task_group(group_id="tg_info")
+    # def tg_info():
+    #     info_symbol_gcs = ul_to_gcs.partial(source='info', DWH=DWH).expand(ticker=info_symbol_local_ref)
+    #     info_symbol_bqext =create_bq_table.partial(source='info', DWH=DWH).expand(ticker=info_symbol_gcs)
     dlt_pipeline_info = run_dlt_pl(source='info', full_load=True, DWH=DWH)
     remove_local_info = remove_local(source='info')
 
     # etf tasks
     ETF_symbol_local >> symbols >> remove_local_etf
-    ETF_symbol_local >> tg_etf() >> remove_local_etf
+    # ETF_symbol_local >> tg_etf() >> remove_local_etf
     ETF_symbol_local  >> dlt_pipeline_etf >> remove_local_etf
 
     # price tasks
     symbols >> price_symbol_local
-    price_symbol_local >> tg_price() >> remove_local_price
+    # price_symbol_local >> tg_price() >> remove_local_price
     price_symbol_local >> dlt_pipeline_price >> remove_local_price
 
     # info tasks
     symbols >> info_symbol_local >> info_symbol_local_ref
-    info_symbol_local_ref >> tg_info() >> remove_local_info
+    # info_symbol_local_ref >> tg_info() >> remove_local_info
     info_symbol_local_ref >> dlt_pipeline_info >> remove_local_info
 
     # trigger ticker_transformations_dag
