@@ -7,6 +7,7 @@ DAG to run ingestion pipeline for a given environment (input parameter):
 5. Removing local data
 """
 import ast
+from datetime import datetime
 import json
 import logging
 import os
@@ -84,10 +85,11 @@ def fetch_symbols_for_etf(filename):
     fpath = os.path.join(rootpath, 'data', filename)
     symbols = FetchSymbols(file = fpath).symbols
     return symbols
-    
+
 @dag(
     schedule='0 1 * * 6',
     start_date=days_ago(3), 
+    # start_date=datetime(2025, 6, 1),
     catchup=True,
     description="Start the pipeline for a given environment",
     doc_md = __doc__,
