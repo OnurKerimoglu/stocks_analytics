@@ -53,17 +53,18 @@ class FetchForecast:
         return self.fpath
 
     def store_df(self, df):
-        # add asof date
+        # add ticker and asof date columns
+        df['Ticker'] = self.ticker
         df['asof'] = pd.to_datetime(self.datestr, utc=True).tz_convert(None)
         df.to_parquet(self.fpath)
         self.logger.info(f'Forecast data stored in {self.fpath}')
 
     def call_api(self) -> tuple:
         if self.endpoint.split("/")[-1] in ["from_symbol"]:
-            self.logger.info(f"Sending the ticker sybol to the forecast API ({self.api_env}) {self.endpoint} endpoint")
+            self.logger.info(f"Sending the ticker sybol to the forecast API: {self.api_url}/{self.endpoint}")
             pl_in = {"ticker": self.ticker, "past_horizon": self.past_horizon}
         elif self.endpoint.split("/")[-1] in ["from_data"]:
-            self.logger.info(f"Formatting and sending ticker data to the forecast API ({self.api_env}) {self.endpoint} endpoint")
+            self.logger.info(f"Formatting and sending ticker data to the forecast API: {self.api_url}/{self.endpoint}")
             pl_in = self.build_payload_with_data(ticker=self.ticker, past_horizon=self.past_horizon)
         resp = requests.post(f"{self.api_url}/{self.endpoint}", json=pl_in, timeout=30)
         if resp.status_code == 200:
@@ -124,5 +125,5 @@ class FetchForecast:
 
 if __name__ == "__main__":
     API_URL_TEMPLATE = os.environ.get("API_URL_TEMPLATE")
-    api_url = API_URL_TEMPLATE.replace("ENV", 'dev')
+    api_url = API_URL_TEMPLATE.replace("ENV", 'prod')
     fpath = FetchForecast(api_url, "AAPL").run()
