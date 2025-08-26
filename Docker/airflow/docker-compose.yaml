@@ -82,6 +82,7 @@ x-airflow-common:
     PG_PASSWORD: ${PG_PASSWORD}
     PG_PORT: ${PG_PORT}
     PG_DATABASE: ${PG_DATABASE}
+    API_URL_TEMPLATE: ${API_URL_TEMPLATE}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-../..}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-../..}/data:/opt/airflow/data
