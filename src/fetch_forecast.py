@@ -3,6 +3,7 @@ import logging
 import os
 
 import pandas as pd
+import pyarrow.parquet as pq
 import requests
 
 from src.shared import config_logger
@@ -50,15 +51,22 @@ class FetchForecast:
     def run(self):
         _, fcst_df = self.call_api()
         self.store_df(fcst_df)
-        # for testing:
-        # df = pd.read_parquet(self.fpath)
+        # df = pd.read_parquet(self.fpath)  # for testing
+        schema_str = pq.read_schema(self.fpath)
+        self.logger.info(f"schema: {schema_str}")
         return self.fpath
 
     def store_df(self, df):
         # add ticker and asof date columns
         df['Ticker'] = self.ticker
         df['asof'] = pd.to_datetime(self.datestr, utc=True).tz_convert(None)
-        df.to_parquet(self.fpath)
+        df.to_parquet(
+            self.fpath,
+            engine="pyarrow",
+            index=False,
+            coerce_timestamps="us",         # convert from ns to microsecond
+            allow_truncated_timestamps=True # drop any sub-microsecond precision
+        )
         self.logger.info(f'Forecast data stored in {self.fpath}')
 
     def call_api(self) -> tuple:
