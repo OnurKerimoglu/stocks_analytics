@@ -50,6 +50,8 @@ class FetchForecast:
     def run(self):
         _, fcst_df = self.call_api()
         self.store_df(fcst_df)
+        # for testing:
+        # df = pd.read_parquet(self.fpath)
         return self.fpath
 
     def store_df(self, df):
@@ -124,6 +126,6 @@ class FetchForecast:
     
 
 if __name__ == "__main__":
-    API_URL_TEMPLATE = os.environ.get("API_URL_TEMPLATE")
+    API_URL_TEMPLATE = os.environ.get("API_URL_TEMPLATE", 'not_found')
     api_url = API_URL_TEMPLATE.replace("ENV", 'prod')
     fpath = FetchForecast(api_url, "AAPL").run()
