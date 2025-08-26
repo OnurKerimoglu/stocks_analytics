@@ -1,5 +1,4 @@
 import os
-import subprocess
 import logging
 
 from airflow.decorators import dag, task
@@ -11,8 +10,13 @@ from airflow.utils.trigger_rule import TriggerRule
 
 from src.config import load_configs
 from src.fetch_forecast import FetchForecast
+from src.schemas import table_schema_forecast_raw
 from src.shared import config_logger
-from src.gc_functions import get_data_from_bq_operator, upload_to_gcs
+from src.gc_functions import (
+    get_data_from_bq_operator,
+    upload_to_gcs,
+    load_parquet_append
+    )
 
 config_logger('info')
 logger = logging.getLogger(__name__)
@@ -162,18 +166,28 @@ def etf_forecasts_dag():
         return object_name
     
     @task
-    def append_to_bq(DWH: dict, object_name: str):
+    def append_to_bq_table(DWH: dict, object_name: str):
         fname = os.path.basename(object_name)
-        logger.info(f'Appending {fname} to {DWH["DS_raw"]}.{DWH["T_forecasts"]}')
+        full_table_id = f"{DWH['project']}.{DWH['DS_raw']}.{DWH['T_forecasts']}"
+        logger.info(f'Appending {fname} to {full_table_id}')
+        uris = f"gs://{DWH['bucket']}/{object_name}" # can be a wildcard
+        load_parquet_append(
+            credentials_path,
+            uris,
+            full_table_id=full_table_id,
+            schema=table_schema_forecast_raw)
         return fname
 
     @task
-    def remove_local(source: str, fname: str):
-        fpath = fetch_file_paths(
-            os.path.join(rootpath, 'data', source, fname))
-        logger.info(f"Removing {fpath}")
-        # os.remove(fpath)
-        return fpath
+    def remove_local(source: str):
+        fpaths = fetch_file_paths(
+            os.path.join(rootpath, 'data', source),
+            'parquet')
+        logger.info(f"Found {len(fpaths)} to remove")
+        for fpath in fpaths:
+            os.remove(fpath)
+            logger.info(f"Removed {fpath}")
+        return 'done'
     
     pull_env_task = pull_env()
     resolve_env_task = resolve_env()
@@ -183,8 +197,8 @@ def etf_forecasts_dag():
     etf_symbols = fetch_unique_etfs(DWH)    
     fpaths = fetch_forecasts.partial(DWH=DWH).expand(ETF_symbol=etf_symbols)
     ul_object_names = ul_to_gcs.partial(DWH=DWH).expand(fpath=fpaths)
-    ap_fnames = append_to_bq.partial(DWH=DWH).expand(object_name=ul_object_names)
-    remove_task = remove_local.partial(source='forecast').expand(fname=ap_fnames)
-    etf_symbols >> fpaths >> ul_object_names >> ap_fnames >> remove_task
+    ap_fnames = append_to_bq_table.partial(DWH=DWH).expand(object_name=ul_object_names)
+    remove_local_forecast= remove_local(source='forecast')
+    etf_symbols >> fpaths >> ul_object_names >> ap_fnames >> remove_local_forecast
 
 dag_instance = etf_forecasts_dag()
