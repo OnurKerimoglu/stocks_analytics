@@ -1,6 +1,8 @@
 import logging
+from typing import List, Union, Optional
 
 from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateExternalTableOperator
+from google.api_core.exceptions import NotFound
 from google.cloud import storage, bigquery
 from google.oauth2 import service_account
 
@@ -93,6 +95,69 @@ def get_data_from_bq_operator(
     data = query_job.result()  # Waits for query to finish
     return data.to_dataframe() # Return as a pandas DataFrame
 
+def ensure_table(
+    client: bigquery.Client,
+    full_table_id: str,
+    schema: List[bigquery.SchemaField],
+    partition_field: Optional[str] = "asof",
+    clustering_fields: Optional[List[str]] = "Ticker"
+) -> None:
+    table = bigquery.Table(full_table_id, schema=schema)
+    if partition_field:
+        table.time_partitioning = bigquery.TimePartitioning(field=partition_field)
+    if clustering_fields:
+        table.clustering_fields = clustering_fields
+
+    client.create_table(table)
+
+def load_parquet_append(
+    credentials_path: str,    
+    gcs_uris: Union[str, List[str]],
+    full_table_id: str,
+    schema: List[bigquery.SchemaField],
+    write_disposition: bigquery.WriteDisposition = bigquery.WriteDisposition.WRITE_APPEND,
+) -> bigquery.LoadJob:
+    """
+    Load Parquet file(s) from GCS into BigQuery with WRITE_APPEND.
+    Pass a wildcard URI or a list of URIs.
+    """
+    credentials = service_account.Credentials.from_service_account_file(
+        credentials_path,
+        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    )
+    logger.info(f"Instantiating BQ Client with credentials from {credentials_path}")
+    client = bigquery.Client(
+        credentials=credentials)
+
+    try:
+        client.get_table(full_table_id)
+    except NotFound:
+        ensure_table(
+            client,
+            full_table_id=full_table_id,
+            schema=schema,
+            partition_field="Date",
+            clustering_fields=["Ticker"],
+        )
+
+    # Build load job config
+    job_config = bigquery.LoadJobConfig(
+        source_format=bigquery.SourceFormat.PARQUET,
+        write_disposition=write_disposition,
+        schema=schema,
+        autodetect=False,
+    )
+    # Submit job
+    job = client.load_table_from_uri(
+        gcs_uris,                # str or list[str]
+        full_table_id,
+        job_config=job_config,
+    )
+    result = job.result()        # wait for completion (raises on error)
+    # Basic report
+    table = client.get_table(full_table_id)
+    print(f"Loaded {result.output_rows} rows into {full_table_id}. Now {table.num_rows} total rows.")
+    return job
 
 if __name__ == "__main__":
     credentials_path = "/home/onur/gcp-keys/stocks-455113-eb2c3f563c78.json"
