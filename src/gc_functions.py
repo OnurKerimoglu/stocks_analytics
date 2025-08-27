@@ -95,27 +95,34 @@ def get_data_from_bq_operator(
     data = query_job.result()  # Waits for query to finish
     return data.to_dataframe() # Return as a pandas DataFrame
 
-def ensure_table(
+def create_table(
     client: bigquery.Client,
     full_table_id: str,
     schema: List[bigquery.SchemaField],
-    partition_field: Optional[str] = "asof",
-    clustering_fields: Optional[List[str]] = "Ticker"
+    time_partition_field:str,
+    clustering_fields: List[str],
+    ttl_days: Optional[int] = 35  # time to live in days
 ) -> None:
+    ttl_ms = ttl_days * 24 * 60 * 60 * 1000
     table = bigquery.Table(full_table_id, schema=schema)
-    if partition_field:
-        table.time_partitioning = bigquery.TimePartitioning(field=partition_field)
+    if time_partition_field:
+        table.time_partitioning = bigquery.TimePartitioning(
+            field=time_partition_field,
+            type_=bigquery.TimePartitioningType.DAY,
+            expiration_ms=ttl_ms)
     if clustering_fields:
         table.clustering_fields = clustering_fields
-
+    table.require_partition_filter = True
     client.create_table(table)
+    logger.info(f"Created {full_table_id} clustered on {clustering_fields} and partitioned by {time_partition_field} with TTL: {ttl_days} days")
 
-def load_parquet_append(
+def bq_load_parquet_append(
     credentials_path: str,    
     gcs_uris: Union[str, List[str]],
     full_table_id: str,
     schema: List[bigquery.SchemaField],
-    write_disposition: bigquery.WriteDisposition = bigquery.WriteDisposition.WRITE_APPEND,
+    time_partition_field: str,
+    clustering_fields: List[str]
 ) -> bigquery.LoadJob:
     """
     Load Parquet file(s) from GCS into BigQuery with WRITE_APPEND.
@@ -132,18 +139,18 @@ def load_parquet_append(
     try:
         client.get_table(full_table_id)
     except NotFound:
-        ensure_table(
+        create_table(
             client,
             full_table_id=full_table_id,
             schema=schema,
-            partition_field="Date",
-            clustering_fields=["Ticker"],
+            time_partition_field=time_partition_field,
+            clustering_fields=clustering_fields
         )
 
     # Build load job config
     job_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.PARQUET,
-        write_disposition=write_disposition,
+        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         schema=schema,
         autodetect=False,
     )

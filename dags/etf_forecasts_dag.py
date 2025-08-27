@@ -15,7 +15,7 @@ from src.shared import config_logger
 from src.gc_functions import (
     get_data_from_bq_operator,
     upload_to_gcs,
-    load_parquet_append
+    bq_load_parquet_append
     )
 
 config_logger('info')
@@ -171,11 +171,13 @@ def etf_forecasts_dag():
         full_table_id = f"{DWH['project']}.{DWH['DS_raw']}.{DWH['T_forecasts']}"
         logger.info(f'Appending {fname} to {full_table_id}')
         uris = f"gs://{DWH['bucket']}/{object_name}" # can be a wildcard
-        load_parquet_append(
+        bq_load_parquet_append(
             credentials_path,
             uris,
             full_table_id=full_table_id,
-            schema=table_schema_forecast_raw)
+            schema=table_schema_forecast_raw,
+            time_partition_field="asof",
+            clustering_fields=["Ticker"])
         return fname
 
     @task
