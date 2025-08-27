@@ -116,6 +116,21 @@ def etf_transformations_dag():
         return symbols
 
     @task
+    def etf_forecasts_isolate_latest(**context):
+        env = context['ti'].xcom_pull(task_ids='resolve_env', key='resolved_env')
+        logger.info('running etf_forecasts_isolate_latest (for all etfs)')
+        bash_command = f"dbt run -s etf_forecasts_latest --profiles-dir {dbt_dir}/config --project-dir {dbt_dir} --target {env}"
+        result = subprocess.run(
+            bash_command,
+            shell=True,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        logger.info(result.stdout)
+        return 'done'
+
+    @task
     def etf_tickers_combine(ETF_symbol: str, **context):
         env = context['ti'].xcom_pull(task_ids='resolve_env', key='resolved_env')
         logger.info(f'etf_tickers_combine: {ETF_symbol}')
@@ -168,9 +183,13 @@ def etf_transformations_dag():
     DWH = load_configs_task()
     branch >> [pull_env_task, skip_pull_env_task] >> resolve_env_task >> DWH
     
-    etf_symbols = fetch_unique_etfs(DWH)    
+    etf_symbols = fetch_unique_etfs(DWH)
+    forecasts_task = etf_forecasts_isolate_latest()
     combined_etf_symbol = etf_tickers_combine.expand(ETF_symbol=etf_symbols)
     etf_top_ticker_prices.expand(ETF_symbol=combined_etf_symbol)
     etf_sector_aggregates.expand(ETF_symbol=combined_etf_symbol)
+
+    etf_symbols >> forecasts_task 
+    etf_symbols >> combined_etf_symbol
 
 dag_instance = etf_transformations_dag()
