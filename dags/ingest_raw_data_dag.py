@@ -263,9 +263,9 @@ def ingest_raw_data_dag():
             logger.info(f"Removed {fpath}")
         return 'done'
     
-    triggered_ticker_transformations_dag = TriggerDagRunOperator(
-        trigger_dag_id="ticker_transformations_dag",
-        task_id="triggered_ticker_transf_dag",
+    triggered_etf_forecasts_dag = TriggerDagRunOperator(
+        trigger_dag_id="etf_forecasts_dag",
+        task_id="triggered_etf_fcst_dag",
         execution_date="{{ execution_date }}",
         reset_dag_run=True,
         wait_for_completion=False,
@@ -326,11 +326,11 @@ def ingest_raw_data_dag():
     # info_symbol_local_ref >> tg_info() >> remove_local_info
     info_symbol_local_ref >> dlt_pipeline_info >> remove_local_info
 
-    # trigger ticker_transformations_dag
-    remove_local_etf >> triggered_ticker_transformations_dag
-    remove_local_price >> triggered_ticker_transformations_dag
-    remove_local_info >> triggered_ticker_transformations_dag
-    dlt_pipeline_info >> triggered_ticker_transformations_dag 
-    dlt_pipeline_price >> triggered_ticker_transformations_dag
+    # trigger etf_forecasts_dag
+    remove_local_etf >> triggered_etf_forecasts_dag
+    remove_local_price >> triggered_etf_forecasts_dag
+    remove_local_info >> triggered_etf_forecasts_dag
+    dlt_pipeline_info >> triggered_etf_forecasts_dag 
+    dlt_pipeline_price >> triggered_etf_forecasts_dag
 
 dag_instance = ingest_raw_data_dag()

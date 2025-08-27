@@ -5,6 +5,7 @@ from airflow.decorators import dag, task
 from airflow.models.param import Param
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
 from airflow.utils.trigger_rule import TriggerRule
 
@@ -191,6 +192,15 @@ def etf_forecasts_dag():
             logger.info(f"Removed {fpath}")
         return 'done'
     
+    triggered_ticker_transformations_dag = TriggerDagRunOperator(
+        trigger_dag_id="ticker_transformations_dag",
+        task_id="triggered_ticker_transf_dag",
+        execution_date="{{ execution_date }}",
+        reset_dag_run=True,
+        wait_for_completion=False,
+        deferrable=False
+    )
+    
     pull_env_task = pull_env()
     resolve_env_task = resolve_env()
     DWH = load_configs_task()
@@ -202,5 +212,7 @@ def etf_forecasts_dag():
     ap_fnames = append_to_bq_table.partial(DWH=DWH).expand(object_name=ul_object_names)
     remove_local_forecast= remove_local(source='forecast')
     etf_symbols >> fpaths >> ul_object_names >> ap_fnames >> remove_local_forecast
+
+    remove_local_forecast >> triggered_ticker_transformations_dag
 
 dag_instance = etf_forecasts_dag()
