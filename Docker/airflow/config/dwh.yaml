@@ -4,6 +4,7 @@ shared:
   T_etfs: etfs
   T_info: stock_info
   T_prices: stock_prices
+  T_forecasts: stock_forecasts
   T_etfs2track: ETFS_to_track
 dev:
   bucket: stocks-455113-raw-dev

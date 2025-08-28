@@ -1,25 +1,41 @@
 import os
-import subprocess
 import logging
 
 from airflow.decorators import dag, task
 from airflow.models.param import Param
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
 from airflow.utils.trigger_rule import TriggerRule
 
 from src.config import load_configs
+from src.fetch_forecast import FetchForecast
+from src.schemas import table_schema_forecast_raw
 from src.shared import config_logger
-from src.gc_functions import get_data_from_bq_operator
+from src.gc_functions import (
+    get_data_from_bq_operator,
+    upload_to_gcs,
+    bq_load_parquet_append
+    )
 
 config_logger('info')
 logger = logging.getLogger(__name__)
 
 rootpath = os.environ.get("AIRFLOW_HOME")
 credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+API_URL_TEMPLATE = os.environ.get("API_URL_TEMPLATE")
 dbt_dir = os.path.join(rootpath, 'dbt', 'stocks_dbt')
 DEFAULT_ENV = "prod"
+
+def fetch_file_paths(dirpath, ext):
+    # construct a list of absolute paths based on the 
+    # files with the specified extension in the self.datapth folder
+    fpaths = []
+    for f in os.listdir(dirpath):
+        if f.endswith(f'.{ext}'):
+            fpaths.append(os.path.join(dirpath, f))
+    return fpaths
 
 def decide_branch(**kwargs):
     env = kwargs['params'].get('env')
@@ -43,10 +59,16 @@ def decide_branch(**kwargs):
             type="string",
             title="environment",
             enum=["dev", "prod", "upstream"]
+        ),
+        'api_env': Param(
+            "prod",
+            type="string",
+            title="API environment",
+            enum = ["dev", "prod"],
         )
     }
 )
-def etf_transformations_dag():
+def etf_forecasts_dag():
 
     branch = BranchPythonOperator(
         task_id='branch_env',
@@ -115,81 +137,82 @@ def etf_transformations_dag():
         logger.info(f'Returnig {len(symbols)} unique symbols: {symbols}')
         return symbols
 
-    @task
-    def etf_forecasts_isolate_latest(**context):
-        env = context['ti'].xcom_pull(task_ids='resolve_env', key='resolved_env')
-        logger.info('running etf_forecasts_isolate_latest (for all etfs)')
-        bash_command = f"dbt run -s etf_forecasts_latest --profiles-dir {dbt_dir}/config --project-dir {dbt_dir} --target {env}"
-        result = subprocess.run(
-            bash_command,
-            shell=True,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        logger.info(result.stdout)
-        return 'done'
 
     @task
-    def etf_tickers_combine(ETF_symbol: str, **context):
-        env = context['ti'].xcom_pull(task_ids='resolve_env', key='resolved_env')
-        logger.info(f'etf_tickers_combine: {ETF_symbol}')
-        vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
-        bash_command=f"dbt run -s etf_tickers_combine --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir} --target {env}"
-        result = subprocess.run(
-            bash_command,
-            shell=True,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        logger.info(result.stdout)
-        return ETF_symbol
-
-    @task
-    def etf_top_ticker_prices(ETF_symbol: str, **context):
-        env = context['ti'].xcom_pull(task_ids='resolve_env', key='resolved_env')
-        logger.info(f'etf_top_ticker_prices: {ETF_symbol}')
-        vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
-        # 'etf_top_ticker_prices',     
-        bash_command=f"dbt run -s etf_top_ticker_prices --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir} --target {env}"
-        result = subprocess.run(
-            bash_command,
-            shell=True,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        logger.info(result.stdout)
+    def fetch_forecasts(ETF_symbol: str, DWH: dict, **context):
+        api_env = context['params'].get('api_env')
+        api_url = API_URL_TEMPLATE.replace("ENV", api_env)
+        logger.info(f'Getting historical data for {ETF_symbol}')
+        df_hist = get_data_from_bq_operator(
+            credentials_path,
+            f"SELECT date, close FROM {DWH['DS_raw']}.{DWH['T_prices']} WHERE symbol = '{ETF_symbol}'"
+            )
+        df_hist.rename(columns={'date': 'Date', 'close': 'Close'}, inplace=True)
+        logger.info(f'Fetching forecast for {ETF_symbol}')
+        fpath = FetchForecast(api_url, ETF_symbol, df_hist).run()
+        return fpath
     
     @task
-    def etf_sector_aggregates (ETF_symbol: str, **context):
-        env = context['ti'].xcom_pull(task_ids='resolve_env', key='resolved_env')
-        logger.info(f'etf_sector_aggregates : {ETF_symbol}')
-        vararg = r'{etf_symbol: ' + f"{ETF_symbol}" + r'}'
-        #'etf_sector_aggregates',        
-        bash_command=f"dbt run -s etf_sector_aggregates --vars '{vararg}' --profiles-dir {dbt_dir}/config --project-dir {dbt_dir} --target {env}"
-        result = subprocess.run(
-            bash_command,
-            shell=True,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        logger.info(result.stdout)
+    def ul_to_gcs(DWH: dict, fpath: str, source: str = 'forecast'):
+        logger.info(f"Uploading {fpath} in GCS")
+        object_name=f"{source}/{os.path.basename(fpath)}"
+        if os.path.exists(fpath):
+            logger.info(f"Uploading {fpath} to {object_name}")
+            upload_to_gcs(
+                bucket = DWH['bucket'],
+                object_name=object_name,
+                local_file=fpath)
+        else:
+            logger.warning(f"{fpath} does not exist")
+        return object_name
+    
+    @task
+    def append_to_bq_table(DWH: dict, object_name: str):
+        fname = os.path.basename(object_name)
+        full_table_id = f"{DWH['project']}.{DWH['DS_raw']}.{DWH['T_forecasts']}"
+        logger.info(f'Appending {fname} to {full_table_id}')
+        uris = f"gs://{DWH['bucket']}/{object_name}" # can be a wildcard
+        bq_load_parquet_append(
+            credentials_path,
+            uris,
+            full_table_id=full_table_id,
+            schema=table_schema_forecast_raw,
+            time_partition_field="asof",
+            clustering_fields=["Ticker"])
+        return fname
+
+    @task
+    def remove_local(source: str):
+        fpaths = fetch_file_paths(
+            os.path.join(rootpath, 'data', source),
+            'parquet')
+        logger.info(f"Found {len(fpaths)} to remove")
+        for fpath in fpaths:
+            os.remove(fpath)
+            logger.info(f"Removed {fpath}")
+        return 'done'
+    
+    triggered_ticker_transformations_dag = TriggerDagRunOperator(
+        trigger_dag_id="ticker_transformations_dag",
+        task_id="triggered_ticker_transf_dag",
+        execution_date="{{ execution_date }}",
+        reset_dag_run=True,
+        wait_for_completion=False,
+        deferrable=False
+    )
     
     pull_env_task = pull_env()
     resolve_env_task = resolve_env()
     DWH = load_configs_task()
     branch >> [pull_env_task, skip_pull_env_task] >> resolve_env_task >> DWH
     
-    etf_symbols = fetch_unique_etfs(DWH)
-    forecasts_task = etf_forecasts_isolate_latest()
-    combined_etf_symbol = etf_tickers_combine.expand(ETF_symbol=etf_symbols)
-    etf_top_ticker_prices.expand(ETF_symbol=combined_etf_symbol)
-    etf_sector_aggregates.expand(ETF_symbol=combined_etf_symbol)
+    etf_symbols = fetch_unique_etfs(DWH)    
+    fpaths = fetch_forecasts.partial(DWH=DWH).expand(ETF_symbol=etf_symbols)
+    ul_object_names = ul_to_gcs.partial(DWH=DWH).expand(fpath=fpaths)
+    ap_fnames = append_to_bq_table.partial(DWH=DWH).expand(object_name=ul_object_names)
+    remove_local_forecast= remove_local(source='forecast')
+    etf_symbols >> fpaths >> ul_object_names >> ap_fnames >> remove_local_forecast
 
-    etf_symbols >> forecasts_task 
-    etf_symbols >> combined_etf_symbol
+    remove_local_forecast >> triggered_ticker_transformations_dag
 
-dag_instance = etf_transformations_dag()
+dag_instance = etf_forecasts_dag()
