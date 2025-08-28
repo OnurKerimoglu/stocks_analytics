@@ -82,6 +82,7 @@ x-airflow-common:
     PG_PASSWORD: ${PG_PASSWORD}
     PG_PORT: ${PG_PORT}
     PG_DATABASE: ${PG_DATABASE}
+    API_URL_TEMPLATE: ${API_URL_TEMPLATE}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-../..}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-../..}/data:/opt/airflow/data
@@ -91,7 +92,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - /secrets/gcp-keys:/opt/airflow/gcp-keys:ro
-    # - /home/onur/gcp-keys:/opt/airflow/gcp-keys:ro
+      # - /home/onur/gcp-keys:/opt/airflow/gcp-keys:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -114,7 +115,7 @@ services:
       interval: 10s
       retries: 5
       start_period: 5s
-    restart: always
+    restart: unless-stopped
 
   redis:
     # Redis is limited to 7.2-bookworm due to licencing change
@@ -128,7 +129,7 @@ services:
       timeout: 30s
       retries: 50
       start_period: 30s
-    restart: always
+    restart: unless-stopped
 
   airflow-webserver:
     <<: *airflow-common
@@ -141,7 +142,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: unless-stopped
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -156,7 +157,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: unless-stopped
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -179,7 +180,7 @@ services:
       # Required to handle warm shutdown of the celery workers properly
       # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
       DUMB_INIT_SETSID: "0"
-    restart: always
+    restart: unless-stopped
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -194,7 +195,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: unless-stopped
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -295,7 +296,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: unless-stopped
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
