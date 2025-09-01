@@ -16,7 +16,8 @@ from airflow.decorators import dag, task, task_group
 from airflow.models import Variable
 from airflow.models.param import Param
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.utils.dates import days_ago
+# from airflow.utils.dates import days_ago
+import pendulum
 
 from src.config import load_configs
 from src.shared import config_logger, reformat_json_to_parquet
@@ -87,9 +88,10 @@ def fetch_symbols_for_etf(filename):
     return symbols
 
 @dag(
-    schedule='0 1 * * 6',
-    start_date=days_ago(3), 
+    schedule='0 3 * * 6',
+    # start_date=days_ago(3), 
     # start_date=datetime(2025, 6, 1),
+    start_date=pendulum.datetime(2025, 8, 28, 1, 0, tz=pendulum.timezone("Europe/Brussels")),
     catchup=True,
     description="Start the pipeline for a given environment",
     doc_md = __doc__,
