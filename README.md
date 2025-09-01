@@ -15,15 +15,49 @@ So far I have prioritized the more complex problem of ETFs for which the freely 
 
 # Solution Architecture
 
-Here is a high-level overview of the solution architecture: 
+Here the solution architecture as a L2 flowchart (visualisation on local IDE may require mermaid previewer extension. A more colorful png version can be seen in [documentation](documentation/documentation.md) ):
+```mermaid
+---
+config:
+  layout: dagre
+  look: classic
+  theme: dark
+---
+flowchart TB
+ subgraph Ext["External Data"]
+        Yfinance["Yahoo Finance"]
+  end
+ subgraph APl["Data Engineering Platform"]
+        Analyst["Analyst"]
+        Af["Airflow"]
+        dlt["dltHub"]
+        dbt["dbt"]
+        DL["GCS"]
+        DWH["BigQuery"]
+  end
+ subgraph Adashboard["Streamlit UI"]
+        CP["Control Panel"]
+        ADashboard["Dashboard"]
+  end
+RAPI[Forecasting API]    
+DWH -- Cleaned Data --> Af
+DWH -- Track List --> Af
+Af -- Raw Data --> DL -- External Tables --> DWH
+Af -- Raw Data --> dlt -- Cleaned Data --> DWH
+Af -- Cleaned Data --> dbt & RAPI
+dbt -- Refined Data --> DWH
+Yfinance --> Af
+RAPI -- Forecasts --> Af
+DWH -- Refined Data --> ADashboard
+Analyst -- Track List --> CP
+CP -- Track List --> DWH
+ADashboard --> Users["Users"] & Analyst
+```
 
-<img src="documentation/images/Solution_Architecture_GCP.png" alt="data_lake_structure" width="800"/>  
-<br/><br/>
-
-3 main environments can be identified:
-1. A local development environment (green box): this is where the code is developed/maintained and necessary cloud services (via [Terraform](#terraform)) are managed
-2. The cloud environment (blue box): currently the [Google Cloud Platform](https://cloud.google.com/) (see: [cloud services](#cloud-services)), where source code is pulled from GitHub (automated via [scripts/startup.sh](scripts/startup.sh), which is set with the creation of the compute engine resource with Terraform), ran in a [Docker](https://www.docker.com/) container (see [Docker](Docker/airflow)), and data is persisted and processed in a data lake and data warehouse
-3. [Streamlit Web-App](#streamlit-web-app) (orange box) that contains publicly accessible dashboards and admin interfaces to browse and manage ETFs to track.
+Notes:
+- [Terraform](#terraform) is not shown here, with which the cloud resources are managed.
+- As the cloud provider, [Google Cloud Platform](https://cloud.google.com/) is used
+- See the shell scripts inside the [scripts/](scripts/) folder for setting up, starting up and shutting down the compute engines.
 
 In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [data integration](#data-integration) pipelines and finally a brief description and link for an interactive [Streamlit Web-App](#streamlit-web-app) are provided. 
 
@@ -81,7 +115,7 @@ then inside the VM, move the file to the expected location with `mkdir gcp-keys;
 
 See section: [Airflow](#airflow) for the instructions on setting up the Airflow environment.
 
-## Data Lake
+## Data Lake ('raw data')
 All the raw data are stored as .parquet files in two GCS buckets, one for `prod` and one for `dev` environments, with the following structure:
 
 ```
@@ -133,8 +167,8 @@ where (as in the case of data lake explained above), <x.y> are in reference to b
 
 These dataset groups contain following tables:
 
-### <${env}.DS_raw>
-This dataset has two variants for development (suffix: _staging) and production environments (no suffix), where the tables are created by the [dlt (data load tool)](#dlt), called from [Ingestion DAG](#ingestion-dag), orchestrated by [Airflow](#Airflow). They comprise the following tables (apart from auxiliary dlt files):
+### <${env}.DS_raw> ('cleaned data')
+This dataset has two variants for development (suffix: _staging) and production environments (no suffix), and contain the clean, concatenated tables loaded by [dlt (data load tool)](#dlt), called from [Ingestion DAG](#ingestion-dag). They comprise the following tables (apart from auxiliary dlt files):
 - etfs: concateneted [ETF Compositions](#etf-compositions) for all ETFs being tracked, as identified by `fund_ticker` column
 - stock_forecasts: raw forecasts are simply appended to this table (no merges, no overwrites). To prevent overgrowth, a TTL of 35 days are set for `asof` (date of forecast) field.
 - stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
