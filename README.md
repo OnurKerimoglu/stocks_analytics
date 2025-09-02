@@ -15,7 +15,41 @@ So far I have prioritized the more complex problem of ETFs for which the freely 
 
 # Solution Architecture
 
-Here the solution architecture as a L2 flowchart (visualisation on local IDE may require mermaid previewer extension. A more colorful png version can be seen in [documentation](documentation/documentation.md) ):
+Here is the L2 flowchart of the overall solution architecture that shows the major components of the current Analytics Platform (visualisation on local IDE may require mermaid previewer extension) and the external ML platform (see the [github link](https://github.com/OnurKerimoglu/stocks_forecasting_live) for the details) that provides the forecasts:
+
+```mermaid
+---
+config:
+  layout: dagre
+  look: classic
+  theme: dark
+---
+flowchart TB
+  subgraph APl["Analytics Platform"]
+    A_ETL["ELT"]
+    A_STORE[("Lake/Warehouse")]
+    A_UI["Analytics UI"]
+  end
+
+  subgraph MLPl["ML Platform"]
+    ML_TRAIN["Training"]
+    ML_REG[("Artifacts & Registry")]
+    ML_API["Inference API"]
+    ML_MON["Monitoring"]
+  end
+  DataSrc
+  DataSrc["External Data"] 
+  DataSrc --> A_ETL --> A_STORE
+  A_STORE --> A_UI --> Users
+  DataSrc --> ML_TRAIN
+  ML_TRAIN --> ML_REG --> ML_API & ML_MON
+  A_STORE -- "Recent Data" --> ML_API
+  ML_API -- "Forecasts (REST)" -->  A_STORE
+  ML_MON --> ML_TRAIN
+```
+
+
+Here is a more detailed L3 flowchart showing specific processes and technologies used in the analytics platform (A png version can be seen in [documentation](documentation/documentation.md)):
 ```mermaid
 ---
 config:
@@ -32,19 +66,19 @@ flowchart TB
         Af["Airflow"]
         dlt["dltHub"]
         dbt["dbt"]
-        DL["GCS"]
-        DWH["BigQuery"]
+        DL[("GCS")]
+        DWH[("BigQuery")]
   end
  subgraph Adashboard["Streamlit UI"]
         CP["Control Panel"]
         ADashboard["Dashboard"]
   end
 RAPI[Forecasting API]    
-DWH -- Cleaned Data --> Af
+DWH -- Normalized Data --> Af
 DWH -- Track List --> Af
 Af -- Raw Data --> DL -- External Tables --> DWH
-Af -- Raw Data --> dlt -- Cleaned Data --> DWH
-Af -- Cleaned Data --> dbt & RAPI
+Af -- Raw Data --> dlt -- Normalized Data --> DWH
+Af -- Normalized Data --> dbt & RAPI
 dbt -- Refined Data --> DWH
 Yfinance --> Af
 RAPI -- Forecasts --> Af
@@ -59,7 +93,7 @@ Notes:
 - As the cloud provider, [Google Cloud Platform](https://cloud.google.com/) is used
 - See the shell scripts inside the [scripts/](scripts/) folder for setting up, starting up and shutting down the compute engines.
 
-In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [data integration](#data-integration) pipelines and finally a brief description and link for an interactive [Streamlit Web-App](#streamlit-web-app) are provided. 
+In the following sections, detailed descriptions of [data sources](#data-sources), employed [cloud services](#cloud-services) including [data warehouse](#data-warehouse) design, [tools and technical setup](#tools-and-technical-setup), [data integration](#data-integration) pipelines and finally a brief description and link for a [Streamlit Web-App](#streamlit-web-app) that currently serves as the Analytics UI are provided. 
 
 # Data Sources
 
@@ -115,7 +149,7 @@ then inside the VM, move the file to the expected location with `mkdir gcp-keys;
 
 See section: [Airflow](#airflow) for the instructions on setting up the Airflow environment.
 
-## Data Lake ('raw data')
+## Data Lake ('Raw Data')
 All the raw data are stored as .parquet files in two GCS buckets, one for `prod` and one for `dev` environments, with the following structure:
 
 ```
@@ -167,8 +201,8 @@ where (as in the case of data lake explained above), <x.y> are in reference to b
 
 These dataset groups contain following tables:
 
-### <${env}.DS_raw> ('cleaned data')
-This dataset has two variants for development (suffix: _staging) and production environments (no suffix), and contain the clean, concatenated tables loaded by [dlt (data load tool)](#dlt), called from [Ingestion DAG](#ingestion-dag). They comprise the following tables (apart from auxiliary dlt files):
+### <${env}.DS_raw> ('Normalized Data')
+This dataset has two variants for development (suffix: _staging) and production environments (no suffix), and contain the normalized tables loaded by [dlt (data load tool)](#dlt), called from [Ingestion DAG](#ingestion-dag). They comprise the following tables (apart from auxiliary dlt files):
 - etfs: concateneted [ETF Compositions](#etf-compositions) for all ETFs being tracked, as identified by `fund_ticker` column
 - stock_forecasts: raw forecasts are simply appended to this table (no merges, no overwrites). To prevent overgrowth, a TTL of 35 days are set for `asof` (date of forecast) field.
 - stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
@@ -183,7 +217,7 @@ contains external tables for each .parquet file in `etf`, `info` and `price` fol
 - `info_${holding_symbol}`: contain info tables for each `holding_symbol` contained in any of the ETFs being tracked, listing the fundamental holding data such P/E ratio, for instance (one record per holding)
 - `price_${holding_symbol}`: contain price tables for each `holding_symbol` contained in any of the ETFs being tracked, listing daily price (open, close, high, low, volume) histories (typically 100s/1000s of records per holding)
 
-### <${env}.DS_refined>
+### <${env}.DS_refined> ('Refined Data')
 This dataset has also two variants for the development (indicated with _dev suffix) and production (indicated with _prod suffix) environments, and contains transformed data produced by the [dbt (data build tool)](#dbt), called from data transformation DAG's (see: [data integration](#data-integration)), orchestrated by [Airflow](#Airflow). They comprise the following tables:
 - `etf_${etf_name}_sector_aggregates`: for each ETF being tracked, sectoral aggregations: in particular, sum of weights of tickers held by the ETF in each sector 
 - `etf_${etf_name}_tickers_combined`: for each ETF being tracked, combination of select fields from raw etf and info tables, and the price_technicals_last_day (see below)
