@@ -8,6 +8,7 @@ from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator
 from airflow.utils.dates import days_ago
 from airflow.utils.trigger_rule import TriggerRule
+import pendulum
 
 from src.config import load_configs
 from src.shared import config_logger
@@ -30,7 +31,8 @@ def decide_branch(**kwargs):
 
 @dag(
     schedule=None,
-    start_date=days_ago(1), 
+    # start_date=days_ago(1),
+    start_date=pendulum.datetime(2025, 8, 28, 1, 0, tz=pendulum.timezone("Europe/Brussels")),
     catchup=False,
     default_args={
         "owner": "Onur",
