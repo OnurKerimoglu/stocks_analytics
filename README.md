@@ -59,33 +59,34 @@ config:
 ---
 flowchart TB
  subgraph Ext["External Data"]
-        Yfinance["Yahoo Finance"]
+        Yfinance["YahooFinance"]
   end
  subgraph APl["Data Engineering Platform"]
-        Analyst["Analyst"]
-        Af["Airflow"]
-        dlt["dltHub"]
-        dbt["dbt"]
-        DL[("GCS")]
-        DWH[("BigQuery")]
+        Af["Orchestrator"]
+        extr["Ingestion"]
+        dlt["Load"]
+        dbt["Transformations"]
+        DL[("Data Lake")]
+        DWH[("Data Warehouse")]
   end
- subgraph Adashboard["Streamlit UI"]
+ subgraph Adashboard["UI"]
         CP["Control Panel"]
         ADashboard["Dashboard"]
   end
 RAPI[Forecasting API]    
-DWH -- Normalized Data --> Af
-DWH -- Track List --> Af
+DWH -- Dim/Fact --> Af
+DWH -- ETF List --> Af
 Af -- Raw Data --> DL -- External Tables --> DWH
-Af -- Raw Data --> dlt -- Normalized Data --> DWH
-Af -- Normalized Data --> dbt & RAPI
-dbt -- Refined Data --> DWH
-Yfinance --> Af
-RAPI -- Forecasts --> Af
+Af -- Raw Data --> dlt -- Dim/Fact --> DWH
+Af -- Dim/Fact --> dbt
+Af -- Recent --> RAPI
+dbt -- Refined --> DWH
+Yfinance --> extr -- Raw Data -->Af
+RAPI -- Forecast --> Af
 DWH -- Refined Data --> ADashboard
 Analyst -- Track List --> CP
-CP -- Track List --> DWH
-ADashboard --> Users["Users"] & Analyst
+CP -- ETF List --> DWH
+ADashboard --> Users["Users"]
 ```
 
 Notes:
@@ -208,7 +209,46 @@ This dataset has two variants for development (suffix: _staging) and production 
 - stock_info: concatenated [Stock Information](#stock-information)(see above) for all company tickers being tracked, as identified by `symbol` column
 - stock_price: concatenated [Stock Prices](#stock-prices) for all company tickers being tracked, as identified by `symbol` column. 
 
-This design follows the [star schema](https://en.wikipedia.org/wiki/Star_schema), where the stock_price is a rapidly changing fact table, and the etfs and stock_info are the slower-changing dimensions tables.
+This design follows the [star schema](https://en.wikipedia.org/wiki/Star_schema), where the price and price forecasts are  rapidly changing fact tables, the company_info is a slow-changing dimension table, and the etfs_companies is a bridge (or factless fact) table.
+
+```mermaid
+---
+config:
+  layout: dagre
+  look: classic
+  theme: dark
+---
+erDiagram
+    BRIDGE_ETFS_COMPANIES }|--|{ FACT_PRICE_FORECASTS: ""
+    FACT_PRICES }|--|| DIM_COMPANY_INFO: ""
+    BRIDGE_ETFS_COMPANIES }|--|{ FACT_PRICES: ""
+    BRIDGE_ETFS_COMPANIES{
+        VARCHAR ETF_symbol FK
+        VARCHAR Company_symbol FK
+        FLOAT Weight
+    }
+    FACT_PRICES{
+        VARCHAR Symbol FK
+        TIMESTAMP Date
+        FLOAT Open
+        FLOAT Low
+        FLOAT High
+        FLOAT Close
+        FLOAT Volume
+    }
+    DIM_COMPANY_INFO{
+        VARCHAR Company_symbol PK
+        VARCHAR Company_name
+        VARCHAR Sector
+    }
+    FACT_PRICE_FORECASTS{
+        VARCHAR ETF_symbol FK
+        TIMESTAMP Date
+        FLOAT Returns
+        VARCHAR Model_RUN_ID
+        TIMESTAMP AsOf
+    }
+```
 
 ### <${env}.DS_rawext>
 contains external tables for each .parquet file in `etf`, `info` and `price` folders in [data lake](#data-lake), called from [Ingestion DAG](#ingestion-dag). Specifically;
