@@ -63,7 +63,7 @@ flowchart TB
   end
  subgraph APl["Data Engineering Platform"]
         Af["Orchestrator"]
-        extr["Ingestion"]
+        extr["Extraction"]
         dlt["Load"]
         dbt["Transformations"]
         DL[("Data Lake")]
