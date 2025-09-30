@@ -46,11 +46,10 @@ resource "google_storage_bucket" "stocks-dev-bucket" {
   }
 }
 
-
-# resource "google_bigquery_dataset" "stocks_dataset" {
-#   dataset_id = var.bq_dataset_name
-#   location   = var.location
-# }
+module "bigquery_test_sync_raw" {
+  source     = "./modules/bigquery"
+  project = var.project
+}
 
 
 module "gcp_cloud_platform" {
@@ -60,95 +59,95 @@ module "gcp_cloud_platform" {
   display_name = "Service Account for Compute Engine"
 }
 
-module "gcp_compute_engine_vm1" {
-  source       = "./modules/google_compute_engine"
-  service_name = var.gce_vm1_service_name
+# module "gcp_compute_engine_vm1" {
+#   source       = "./modules/google_compute_engine"
+#   service_name = var.gce_vm1_service_name
 
-  region       = var.region
-  zone         = var.zone
-  machine_type = var.gce_vm1_machine_type
-  boot_disk_image = var.gce_vm1_boot_disk_image
-  boot_disk_size = var.gce_vm1_boot_disk_size
-  ssh_user_1         = var.ssh_user_1
-  private_key_path_1 = var.private_key_path_1
-  gcp_key_path_src       = var.gcp_key_path_src
-  gcp_key_path_dest       = var.gcp_key_path_dest
-  init_script_path = abspath("${path.module}/../${var.init_script_relpath}")
+#   region       = var.region
+#   zone         = var.zone
+#   machine_type = var.gce_vm1_machine_type
+#   boot_disk_image = var.gce_vm1_boot_disk_image
+#   boot_disk_size = var.gce_vm1_boot_disk_size
+#   ssh_user_1         = var.ssh_user_1
+#   private_key_path_1 = var.private_key_path_1
+#   gcp_key_path_src       = var.gcp_key_path_src
+#   gcp_key_path_dest       = var.gcp_key_path_dest
+#   init_script_path = abspath("${path.module}/../${var.init_script_relpath}")
 
-  google_service_account_email = module.gcp_cloud_platform.google_service_account_email
-  firewall_name                = "airflow-rule-1"
-  tags                         = ["http-server", "https-server", "airflow-rule"]
-  allow = {
-    1 = {
-      protocol = "icmp"
-      ports    = null
-    },
-    2 = {
-      protocol = "tcp"
-      ports    = ["22", "8080"]
-    },
-  }
-  metadata = {
-    ssh-keys = join("\n", [
-    "${var.ssh_user_1}:${file(var.public_key_path_1)}",
-    "${var.ssh_user_2}:${file(var.public_key_path_2)}",
-    # Add more as needed
-  ])
-  startup-script  = file("${path.module}/../scripts/startup.sh")
-  shutdown-script = file("${path.module}/../scripts/shutdown.sh")
-  }
-}
+#   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
+#   firewall_name                = "airflow-rule-1"
+#   tags                         = ["http-server", "https-server", "airflow-rule"]
+#   allow = {
+#     1 = {
+#       protocol = "icmp"
+#       ports    = null
+#     },
+#     2 = {
+#       protocol = "tcp"
+#       ports    = ["22", "8080"]
+#     },
+#   }
+#   metadata = {
+#     ssh-keys = join("\n", [
+#     "${var.ssh_user_1}:${file(var.public_key_path_1)}",
+#     "${var.ssh_user_2}:${file(var.public_key_path_2)}",
+#     # Add more as needed
+#   ])
+#   startup-script  = file("${path.module}/../scripts/startup.sh")
+#   shutdown-script = file("${path.module}/../scripts/shutdown.sh")
+#   }
+# }
 
 
-module "gcp_compute_engine_vm2" {
-  source       = "./modules/google_compute_engine"
-  service_name = var.gce_vm2_service_name
+# module "gcp_compute_engine_vm2" {
+#   source       = "./modules/google_compute_engine"
+#   service_name = var.gce_vm2_service_name
 
-  region       = var.region
-  zone         = var.zone
-  machine_type = var.gce_vm2_machine_type
-  boot_disk_image = var.gce_vm2_boot_disk_image
-  boot_disk_size = var.gce_vm2_boot_disk_size
-  ssh_user_1         = var.ssh_user_1
-  private_key_path_1 = var.private_key_path_1
-  gcp_key_path_src       = var.gcp_key_path_src
-  gcp_key_path_dest       = var.gcp_key_path_dest
-  init_script_path = file("${path.module}/../${var.init_script_relpath}")
+#   region       = var.region
+#   zone         = var.zone
+#   machine_type = var.gce_vm2_machine_type
+#   boot_disk_image = var.gce_vm2_boot_disk_image
+#   boot_disk_size = var.gce_vm2_boot_disk_size
+#   ssh_user_1         = var.ssh_user_1
+#   private_key_path_1 = var.private_key_path_1
+#   gcp_key_path_src       = var.gcp_key_path_src
+#   gcp_key_path_dest       = var.gcp_key_path_dest
+#   init_script_path = file("${path.module}/../${var.init_script_relpath}")
 
-  google_service_account_email = module.gcp_cloud_platform.google_service_account_email
-  firewall_name                = "airflow-rule"
-  tags                         = ["http-server", "https-server", "airflow-rule"]
-  allow = {
-    1 = {
-      protocol = "icmp"
-      ports    = null
-    },
-    2 = {
-      protocol = "tcp"
-      ports    = ["22", "8080"]
-    },
-  }
-  metadata = {
-    ssh-keys = join("\n", [
-    "${var.ssh_user_1}:${file(var.public_key_path_1)}",
-    "${var.ssh_user_2}:${file(var.public_key_path_2)}",
-    # Add more as needed
-  ])
-  startup-script  = file("${path.module}/../scripts/startup.sh")
-  shutdown-script = file("${path.module}/../scripts/shutdown.sh")
-  }
-}
+#   google_service_account_email = module.gcp_cloud_platform.google_service_account_email
+#   firewall_name                = "airflow-rule"
+#   tags                         = ["http-server", "https-server", "airflow-rule"]
+#   allow = {
+#     1 = {
+#       protocol = "icmp"
+#       ports    = null
+#     },
+#     2 = {
+#       protocol = "tcp"
+#       ports    = ["22", "8080"]
+#     },
+#   }
+#   metadata = {
+#     ssh-keys = join("\n", [
+#     "${var.ssh_user_1}:${file(var.public_key_path_1)}",
+#     "${var.ssh_user_2}:${file(var.public_key_path_2)}",
+#     # Add more as needed
+#   ])
+#   startup-script  = file("${path.module}/../scripts/startup.sh")
+#   shutdown-script = file("${path.module}/../scripts/shutdown.sh")
+#   }
+# }
 
-resource "google_artifact_registry_repository" "airflow_repo" {
-  provider             = google
-  location             = var.region
-  repository_id        = var.repo_name
-  description          = "Artifact Registry for Airflow Docker Images"
-  format               = "DOCKER"
-  docker_config {
-    immutable_tags = false
-  }
-  lifecycle {
-    ignore_changes = [docker_config]
-  }
-}
+# resource "google_artifact_registry_repository" "airflow_repo" {
+#   provider             = google
+#   location             = var.region
+#   repository_id        = var.repo_name
+#   description          = "Artifact Registry for Airflow Docker Images"
+#   format               = "DOCKER"
+#   docker_config {
+#     immutable_tags = false
+#   }
+#   lifecycle {
+#     ignore_changes = [docker_config]
+#   }
+# }
