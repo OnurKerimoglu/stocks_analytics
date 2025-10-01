@@ -11,9 +11,19 @@ variable "src_dataset_raw" {
   default = "stocks_raw"         # prod dataset (module default)
 }
 
-variable "dst_dataset_raw" {
+variable "dst_dataset_raw_clone" {
   type    = string
-  default = "stocks_raw_test"    # test dataset to be cloned from prod (module default)
+  default = "stocks_raw_clone"    # test dataset to be cloned from prod (module default)
+}
+
+variable "src_dataset_refined" {
+  type    = string
+  default = "stocks_refined"         # prod dataset (module default)
+}
+
+variable "dst_dataset_refined_clone" {
+  type    = string
+  default = "stocks_refined_clone"    # test dataset to be cloned from prod (module default)
 }
 
 variable "transfer_schedule" {
