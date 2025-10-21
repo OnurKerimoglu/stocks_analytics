@@ -26,6 +26,16 @@ variable "dst_dataset_refined_clone" {
   default = "stocks_refined_clone"    # test dataset to be cloned from prod (module default)
 }
 
+variable "src_dataset_userdata" {
+  type    = string
+  default = "stocks_user_data"         # prod dataset (module default)
+}
+
+variable "dst_dataset_userdata_clone" {
+  type    = string
+  default = "stocks_user_data_clone"    # test dataset to be cloned from prod (module default)
+}
+
 variable "transfer_schedule" {
   type    = string
   default = "every sunday 23:00"
